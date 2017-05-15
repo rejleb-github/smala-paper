@@ -1,0 +1,782 @@
+%                                                                 aa.dem
+% AA vers. 8.2, LaTeX class for Astronomy & Astrophysics
+% demonstration file
+%                                                       (c) EDP Sciences
+%-----------------------------------------------------------------------
+%
+%\documentclass[referee]{aa} % for a referee version
+%\documentclass[onecolumn]{aa} % for a paper on 1 column  
+%\documentclass[longauth]{aa} % for the long lists of affiliations 
+%\documentclass[rnote]{aa} % for the research notes
+%\documentclass[letter]{aa} % for the letters 
+%\documentclass[bibyear]{aa} % if the references are not structured 
+% according to the author-year natbib style
+
+%
+\documentclass{aa}  
+
+%
+\usepackage{graphicx}
+\usepackage{txfonts}
+%\usepackage[english]{babel}
+%\usepackage[utf8]{inputenc}
+%\usepackage{amsmath}	
+%\usepackage{amssymb}
+%\usepackage[colorinlistoftodos]{todonotes}
+%\usepackage[square, numbers, comma, sort&compress]{natbib}
+%\usepackage{algorithm}
+%\usepackage[noend]{algpseudocode}
+\usepackage{textcomp}
+\usepackage{courier}
+\usepackage{siunitx}
+\usepackage{tabularx}
+\usepackage{pdflscape}
+%\usepackage{afterpage}
+\usepackage{capt-of}% or use the larger `caption` package
+\usepackage{multirow}
+
+
+%\usepackage[options]{hyperref}
+% To add links in your PDF file, use the package "hyperref"
+% with options according to your LaTeX or PDFLaTeX drivers.
+%
+\begin{document} 
+
+
+   \title{Using Langevin Based MCMC in Exoplanet Radial Velocity Surveys}
+
+   \author{R. Leblanc
+          \inst{1,3}
+          \and
+          H. Rein\inst{2,3}
+          \and 
+          E. B. Ford\inst{4,5,6}
+          \and 
+          B. E. Nelson\inst{4,5,6}
+          }
+
+   \institute{Department of Physics, University of Toronto, Toronto, Ontario M5S 1A7, Canada
+   \and
+   Department of Physical and Environmental Sciences, University of Toronto at Scarborough, Toronto, Ontario M1C 1A4, Canada
+   \and 
+   Department of Astronomy and Astrophysics, University of Toronto, Toronto, Ontario M5S 3H4, Canada
+   \and 
+   Center for Exoplanets and Habitable Worlds, The Pennsylvania State University 525 Davey Laboratory, University Park, PA, 16802, USA
+   \and 
+   Department of Astronomy and Astrophysics, The Pennsylvania State University 525 Davey Laboratory, University Park, PA, 16802, USA
+   \and 
+   Department of Astronomy, University of Florida, 211 Bryant Space Science Center, Gainesville, FL 32611, USA
+             }
+
+   \date{Draft - April 12 2017}
+
+% \abstract{}{}{}{}{} 
+% 5 {} token are mandatory
+ 
+  \abstract
+  % context heading (optional)
+  % {} leave it empty if necessary  
+   {In recent years, thousands of exoplanets of been discovered. Given this large amount of data, it is imperative that we optimize our ability to perform analysis. One of the techniques who are used to discover or analyze exoplanets are radial velocities surveys. In order to fit this type data, Markov Chain Monte Carlo (MCMC) methods are often applied.}
+  % aims heading (mandatory)
+   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. This algorithm makes use of more costly but uncorrelated sampling to increase overall efficiency.}
+  % methods heading (mandatory)
+   {The performance we obtain is compared with the performance of another standard MCMC, the affine invariant sampler.}
+  % results heading (mandatory)
+   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large. This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler}
+  % conclusions heading (optional), leave it empty if necessary 
+   {}
+
+   \keywords{MCMC --
+                Radial Velocity --
+                Langevin Based Methods
+               }
+
+   \maketitle
+%
+%________________________________________________________________
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}
+With thousands of exoplanets having already been discovered \citep{exoArchive}, many methods are used or combined to either refine our information or make yet newer discoveries. The two biggest contributors are transit measurements and radial velocity surveys. It may not always be possible to invest into more computing power to process this data. In order to process this large volume of data we need to use efficient Markov Chain Monte Carlo (MCMC) techniques. One route to speed up convergence of posteriors is to have an MCMC which makes better proposals. The idea is that by making these better proposals, we obtain uncorrelated samples, and thus require a smaller sample size to achieve the same effective sample size (ESS).
+
+This is what Langevin MCMC methods do by using derivative information of the likelihood space. These types of techniques have never been implemented in an exoplanet context, and pose various technical challenges. These are discussed at length in section \ref{setup}. To test Langevin methods we require the derivative information, thus we need an analytical coordinate system described by \cite{Pl2009} such that these values are always defined. This calculation needs to be as efficient as possible, so we use an implementation of \texttt{Rebound}'s variational equations from \cite{Rein2016} to compute the $\chi^2$ likelihood derivative. Alongside this, we carefully selected the hyperparameters of the MCMC methods, as explained in section \ref{hyper}.
+
+In this paper we compare our implementation with another MCMC by using the CPU time-normalized effective sample size (shortened to efficiency). We use 3 sample fitting problems to compare the algorithms, where we initialize the MCMC with best known, or true initial conditions. These have dimensions $N=1$, $N=4$, and $N=10$, ranging from the most simplistic case to using real data from a multi-planet system which is in resonance. These results are presented in section \ref{results}.
+ 
+\section{Methods and Setup}\label{setup}
+\subsection{MCMC Methods}
+The Langevin method we chose in our implementation is the Simplified manifold Metropolis-Adjusted Langevin Algorithm (SMALA). The SMALA algorithm simplifies the general N-dimensional MALA algorithm by assuming the space is mostly flat and eliminating the terms in the proposal which account for the curvature of the space \cite{Girolami2011}.
+
+With this simplification, the SMALA approach can be explained with a simple example. Given a Gaussian likelihood space, the Metropolis-Hastings algorithm will randomly wander through the distribution, favoring movement towards the maximum likelihood.
+Rather than doing random jumps, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. The SMALA method will use the first and second derivatives of the sampler to project a parabola. By jumping to the maximum of this parabola, we are able to quickly cross much of the likelihood space. This is shown very well in the sample problems of \cite{Girolami2011}. Depending on how good this parabolic approximation is, we can expect two benefits.
+\begin{itemize}
+\item Reaching the neighborhood of the maximum likelihood within fewer steps.
+\item Highly uncorrelated samples.
+\end{itemize}
+However, this comes with the computational cost of calculating the Hessian, which will scale in $\mathcal{O}(n^2)$.
+
+We will compare the algorithm with the affine invariant sampling MCMC from \cite{Foreman-Mackey2013}. While we created our own python implementation of SMALA, this popular MCMC has its own python package implementation known as EMCEE which we have used in our framework. This MCMC uses an ensemble of walkers to make linear proposals based on certain `moves'. In this work we use simple `stretch moves' which are described in full detail by \citep{Foreman-Mackey2013}.
+
+\subsection{Measures to Ensure Stability}
+Various steps were taken to maximize the numerical stability and usability of the MCMC for fitting exoplanets. Some were directly implemented into \texttt{Rebound}, while others were implemented at a higher level within our framework.
+
+\subsubsection{\texttt{Rebound} Side}\label{analytical}
+In the framework of traditional orbital elements certain derivatives be undefined. For example, the derivative of the argument of periapsis, $\omega$, is undefined when the eccentricity is zero. To remedy this issue we use analytical coordinates. The coordinates by \cite{Pl2009} are trivially analytical since they use trigonometric functions, and are thus infinitely differentiable. In his paper, we find transformations which maps the traditional orbital elements unto an alternative set, $a, e, i, \omega, \Omega, M \to a, h, k, i_x, i_y, \lambda$ where $h$ and $k$ are the Lagrangian orbital elements, and the inclination and longitude are decomposed into $i_x$, $i_y$, and $lambda$ gives the mean longitude. The equations describing this transformation  can be found in the original paper. 
+
+These coordinates come with a caveat, as there are some derivatives undefined when there are more than two planets. This is a special case, when two planets are exactly retrograde. Since this special case is a rather unnatural configuration, it poses no issues in practicality.
+
+We combine these coordinates with the variational equations of \texttt{Rebound} to calculate the likelihood gradient and Hessian. These allow us to integrate the derivatives along with the dynamical system with very high numerical accuracy. These variational equations are initialized such to provide the response of the system with respect to the velocity component of the primary object. For example, a first order variation we could get would be $\frac{dv_x}{dh}$, and for a second order we could obtain $\frac{d^2v_x}{dhda}$. Given every one of these combinations we can build the $\chi^2$ Hessian with respect to the radial velocity measurements.
+
+In order to handle close encounters and collisions we define a minimum distance in terms of Hill radii of the largest planet, shortened to largest hill radii. For our implementation in \texttt{Rebound}, if any exoplanets are within 2 times the largest hill radii of each other, the simulation will exit and return a likelihood of $0$ for this particular system. 
+
+We assume that any planetary system which is observed today must necessarily be long-term stable such that it formed. Unfortunately it is not computationally feasible to test the long-term stability of every sample, so we settle for the short-term stability measure described above.
+
+\subsubsection{Python Side}
+In the python front end we use a few tricks to improve the numerical stability. To handle very low likelihoods without numerical errors growing large, we work in log-likelihood. In addition to this, we avoid correlation bias between the semi-major axis and the mean longitude by making our integrations two-sided, centered on time $t=0$. This correlation stems from the fact that a small change in period can allow `wiggle room' for a small change in phase, unless we allow this small perturbation to affect the data symmetrically.
+
+In order to avoid instability during the inversion of the Hessian we take the soft absolute value of the eigenvalues. This function, called softabs, is described in \cite{softabs}. This function gives the same behavior as an absolute value operator except near $0$ where it is smoothed out according to a scaling variable $\alpha$.An eigenvalue of $0$ assume a value of $1/\alpha$ instead of $0$, which would be problematic, when we use this function.
+
+\subsection{Hyperparameters}\label{hyper}
+Each MCMC algorithm has a set of hyperparameters which must be determined for optimal performance. For SMALA we need to specify a step scale $\epsilon$ and the softabs' $\alpha$ hyperparameter. The $\epsilon$ sets the `aggressiveness' of proposals and is used to fine-tune the acceptance rate. Geometrically, this corresponds to how far up the N-dimensional parabola we let the added `randomness' go. According to Robert and Rosenthal \cite{robert1998} the optimal acceptance rate tends towards $57\%$ as the dimensionality goes to infinity, thus we fix $\epsilon$ to match this. The intuition for the $\alpha$ parameter is that it gives and maximum width to the proposal parabola. In the limiting case where this parameter is miscalculated and inhibits the MCMC's ability to make proposals, SMALA will behave like a Metropolis-Hastings MCMC. This is shown in Figure \ref{alpha}. While if we let $\alpha$ be too large, this may lead to numerical instabilities. In the scenarios of interests, these parameters should approximately be of order unity.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.95\hsize]{alpha.png}
+   \caption{This figure shows the effect of the alpha hyper-parameter on SMALA's sampling by considering 3 cases with increasing errors. Increasing the error on the data affects the sensitivity of the derivatives. This system contains one planet with only mass as a parameter, hence in this simple problem we expect the likelihood space to follow the parabolic approximation very closely. This is seen in cases one and two of this example. In case 3 where the error is greatest, the $\alpha$ parameter takes effect and limits the proposals. All three parabolas are generated from the Hessian at the true mass of the system.}
+      \label{alpha}
+\end{figure}
+
+The EMCEE package takes in an amount of samplers, and the initial conditions of the samplers or `walkers' which make up the ensemble. For the test problems we consider here with dimensionality of up to $N=10$, an ensemble $32$ walkers is sufficient. Increasing the amount of walkers did not provide major improvements in performance. In all cases they were initialized in a small Gaussian sphere centered on the initial conditions given.
+
+\section{Results}\label{results}
+\subsection{Simple Test, $N=1$}
+We use this simple test case to verify the algorithms and introduce the time-normalized ESS which is used to compare the effectiveness of the MCMC. This method is used in other comparative works such as \cite{Girolami2011, 1504.01418, Meyer2016, Lan2015} and many others. The total ESS if limited by the parameter which has the greatest autocorrelation time. Picking the smallest ESS among the $N$ parameters, we obtain $$ESS = \min_N\bigg( \frac{N}{(1+2\sum AC_k)}\bigg)$$ which is then normalized by the total CPU time in seconds. 
+
+For this $N=1$ case we consider a planet with semi-major axis of $0.320$ and about $2.05$ Jupiter masses observed for a few orbits. The generated data has errors of $10$ \si{\metre\per\second} with a small variance and was integrated for three and a half orbits. The fitting parameter selected is the semi-major axis.
+
+The initial conditions of the MCMC are the same as the true conditions. The resulting radial velocity curve is shown in Figure \ref{FigSimple}. In the upper part of the figure we see the initial conditions overlapped with traces of accepted proposals. Below we find the curve generated from taking the average of the resulting posterior samples, along with residuals.
+
+\begin{figure}
+\centering
+\includegraphics[width=0.95\hsize]{rv1.png}
+   \caption{This figure shows the results for the simple test case with SMALA. In the top panel we find the RV curve of the initial conditions in purple and 50 random trails generated from samples in the posterior. This shows the spread in how well the samples fit the curve. The middle and bottom subplot shows the average result after the burn in phase and the residuals of that fit, we can see that the initial conditions are well recovered.}
+      \label{FigSimple}
+\end{figure}
+
+In this simple case 1-D case the SMALA algorithm strongly outperforms EMCEE. This is clearly shown in Table \ref{Table1}. This is due to the low cost of calculating the second derivatives in this sample problem. The highly uncorrelated samples lead to a large ESS, this combined with the above makes the MCMC very efficient in the one dimension case. Both algorithms perfectly recover the original conditions and give identical CDF.
+
+\begin{table}
+\caption{MCMC Efficiency Results}             % title of Table
+\label{Table1}      % is used to refer this table in the text
+\centering                          % used for centering table
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{c c c c c c}        % centered columns (4 columns)
+\hline\hline                 % inserts double horizontal lines
+ & MCMC & Total Iterations & Minimum ESS & Total CPU-Time ($s$) & ESS/T \\    % table heading 
+\hline                        % inserts single horizontal line
+   \multirow{2}{*}{$N=1$} & EMCEE & 768000 & 25560 & 5783 & 4.42 \\      % inserting body of the table
+   & SMALA& 320000 & 213222 & 7554 & 28.2 \\
+\hline                                   %inserts single line
+   \multirow{2}{*}{$N=4$} & EMCEE & 768000 & 14076 & 25233 & 0.558 \\      % inserting body of the table
+   & SMALA& 320000 & 58688 & 172170 & 0.341 \\
+\hline                                   %inserts single
+   \multirow{2}{*}{$N=10$} & EMCEE & 768000 & 1325 & 39292 & 0.03372 \\      % inserting body of the table
+   & SMALA& 320000 & 241 & 1086615 & 0.00022 \\
+\hline                                   %inserts single line
+\end{tabular}
+}
+\end{table}
+
+\subsection{2-Planet Case, $N=4$}
+
+In this problem we try fitting four parameters from two planets, we consider the semi-major axis and phase of each planet. As with the previous example, we start from the true parameters and run both MCMC for a few hundred thousand steps. The synthetic observations have 250 data points with errors centered on $10$ \si{\metre\per\second}. The data spans points are spread out over about a dozen orbits.
+
+The resulting time normalized ESS are $0.558$ and $0.341$ for EMCEE and SMALA respectively, as noted in Table \ref{Table1}. For four parameters, the SMALA algorithm will require a much longer runtime than EMCEE but will still generate posterior samples which are uncorrelated enough to compensate. This results with the algorithms having relatively similar effectiveness.
+
+
+\subsection{Real Data: HD155358, $N=10$}
+
+Now we consider a real data example using the RV data available for HD155358 from \cite{Robertson2012}. In this fit we solve for for ten parameters, for each planet we obtain: $a$, $m\, \sin i$\footnote{Since the $i_x$, $i_y$ parameters are excluded, we are effectively fitting the degenerate mass.}, $h$, $k$ and $\lambda$ as described in Section \ref{analytical}. The parameters obtained fall within errors of the original work by \cite{Robertson2012}.
+
+In this scenario the EMCEE algorithm performs much better than SMALA, having a much higher efficiency by orders of magnitude. This is shown in the last row of Table \ref{Table1} with EMCEE giving $0.03372$ effective samples compared to SMALA's $0.00022$.  
+
+\begin{figure}
+\centering
+\includegraphics[width=0.95\hsize]{rv3.png}
+   \caption{This figure shows the results for the HD155358 system. The uppermost plot shows the initial conditions of the system and the spread in the radial velocity curves generated from the posterior. The initial conditions used were provided by Robertson \cite{Robertson2012}. The radial velocity curve of the average parameters and residuals are presented below. The resulting parameters can be found in the appendix.}
+      \label{FigHD}
+\end{figure}
+
+\section{Discussion \& Conclusion}
+In general, when dealing with a full multi-planet system the SMALA algorithm does not perform well. The computational cost of calculating the metric is no longer beneficial. In addition to this extra cost, we notice that the effective sample size is not longer bigger. When comparing the autocorrelation times of both MCMC, SMALA only produced less correlated samples for a couple of parameters, while emcee performed about the same or better for the majority. We suspect the reason for this comes from the complexity of the high dimensional likelihood space. For a system with two planets that strongly interact, we encounter more nonlinear effects. This appears in some of the posterior samples, as shown by the trails in Figure \ref{FigHD}, we see these strong nonlinear effects on the left side as some RV trails extend above the $0.002$ mark. When the space exhibits such behavior, we might not expect the parabolic approximation to perform so well. As we get many samples in the phase space neighborhood of collisions, the likelihood manifold most likely becomes curved and distorted. This effect may create a minimum autocorrelation threshold which is reached by both MCMC. One possible solution to this dilemma would be to acquire data with smaller errors, this geometrically corresponds to tightening the likelihood well. This would make the space near the maximum adhere more closely to a parabolic approximation, and prevent the MCMC from wandering in the regions of phase space where collisions are likely. It is unclear if lower autocorrelations are feasible in this type of optimization problem by using more sophisticated algorithms.
+
+To summarize, the costs of generating an accurate Hessians outweighs the benefits of highly uncorrelated steps at high dimensionality. The EMCEE algorithm will outperform SMALA by orders of magnitude in large multi-planet systems. The dimensionality threshold where the affine invariant MCMC and the SMALA MCMC perform comparably is around $N = 4$. 
+
+In future works we may consider hybrid MCMC which use both EMCEE and SMALA steps to achieve maximal efficiency by giving each MCMC specific combinations parameter. Another example for potential improvements would be to consider a planet-wise blocked Gibbs sampling approach which could speed up the algorithm. Another method to improve the speed of analysis might be to use the ALSMALA algorithm which uses partial metric updates \cite{1608.07986}. Using an inaccurate metric will lead to more correlated samples, however there may exist an optimum point where overall performance is enhanced.
+
+\begin{acknowledgements}
+	This research was funded by NSERC Discovery Grant RGPIN-2014-04553. Computations were performed on the GPC supercomputer at the SciNet HPC Consortium. SciNet is funded by: the Canada Foundation for Innovation under the auspices of Compute Canada; the Government of Ontario; Ontario Research Fund - Research Excellence; and the University of Toronto.
+\end{acknowledgements}
+
+
+%-------------------------------------------------------------------
+\pagebreak
+
+\bibliographystyle{apa}
+\bibliography{Bibliography}
+
+\begin{appendix} 
+
+\begin{sidewaystable*}
+\caption{MCMC Average Resulting Parameters with 95\% Credible Intervals}\label{Table4}
+\centering
+\begin{tabular}{c c c c c c c c c c c c}        % centered columns (4 columns)
+\hline\hline                 % inserts double horizontal lines
+ & MCMC & $a_0$ & $h_0$ & $k_0$ & $m_0$ ($10^{-4}$) & $\lambda_0$ & $a_1$ & $h_1$ & $k_1$ & $m_1$ ($10^{-4}$) & $\lambda_1$ \\    % table heading 
+\hline                        % inserts single horizontal line
+   \rule{0pt}{4ex}  \multirow{2}{*}{$N=1$} & EMCEE & $0.3192^{+0.0071}_{-0.0076}$ & - & - & - & - & - & - & - & - & - \\
+   \rule{0pt}{4ex} & SMALA &  $0.3193^{+0.0071}_{-0.0076}$ & - & - & - & - & - & - & - & - & -\\
+   \rule{0pt}{4ex}  \multirow{2}{*}{$N=4$} & EMCEE & $0.3198^{+0.0026}_{-0.0026}$ & - & - & - & $1.711^{+0.187}_{-0.184}$ & $0.5817^{+0.0244}_{-0.0221}$ & - & - & - & $1.031^{+0.396}_{-0.394}$ \\
+   \rule{0pt}{4ex} & SMALA &  $0.3199^{+0.0026}_{-0.0026}$ & - & - & - & $1.712^{+0.186}_{-0.184}$ & $0.5817^{+0.0244}_{-0.0221}$ & - & - & - & $1.030^{+0.390}_{-0.388}$\\
+   %\rule{0pt}{3ex}
+   \rule{0pt}{4ex} \multirow{2}{*}{$N=10$} & EMCEE & $0.6586^{+0.0087}_{-0.0089}$ & $-0.11^{+0.35}_{-0.31}$ & $-0.12^{+0.31}_{-0.32}$ & $8.1^{+3.3}_{-3.4}$ & $4.52^{+0.55}_{-0.50}$ & $1.046^{+0.024}_{-0.026}$ & $-0.14^{+0.52}_{-0.45}$ & $-0.05^{+0.50}_{-0.48}$ & $8.5^{+3.5}_{-3.2}$ & $1.54^{+0.62}_{-0.58}$ \\
+   \rule{0pt}{4ex} & SMALA & $0.6508^{+0.0077}_{-0.0076}$ & $-0.14^{+0.31}_{-0.30}$ & $-0.10^{+0.30}_{-0.27}$ & $8.2^{+3.4}_{-3.0}$ & $4.54^{+0.54}_{-0.52}$ & $1.046^{+0.022}_{-0.026}$ & $-0.13^{+0.52}_{-0.42}$ & $-0.04^{+0.47}_{-0.46}$ & $8.6^{+3.5}_{-3.2}$ & $1.52^{+0.60}_{-0.55}$\\
+   %\rule{0pt}{3ex}
+\hline  
+\end{tabular}
+\end{sidewaystable*}
+
+\end{appendix}
+
+%\pagebreak
+%\newpage
+
+\end{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+Examples for figures using graphicx
+A guide "Using Imported Graphics in LaTeX2e"  (Keith Reckdahl)
+is available on a lot of LaTeX public servers or ctan mirrors.
+The file is : epslatex.pdf 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%_____________________________________________________________
+%                 A figure as large as the width of the column
+%-------------------------------------------------------------
+   \begin{figure}
+   \centering
+   \includegraphics[width=\hsize]{empty.eps}
+      \caption{Vibrational stability equation of state
+               $S_{\mathrm{vib}}(\lg e, \lg \rho)$.
+               $>0$ means vibrational stability.
+              }
+         \label{FigVibStab}
+   \end{figure}
+%
+%_____________________________________________________________
+%                                    One column rotated figure
+%-------------------------------------------------------------
+   \begin{figure}
+   \centering
+   \includegraphics[angle=-90,width=3cm]{empty.eps}
+      \caption{Vibrational stability equation of state
+               $S_{\mathrm{vib}}(\lg e, \lg \rho)$.
+               $>0$ means vibrational stability.
+              }
+         \label{FigVibStab}
+   \end{figure}
+%
+%_____________________________________________________________
+%                        Figure with caption on the right side 
+%-------------------------------------------------------------
+   \begin{figure}
+   \sidecaption
+   \includegraphics[width=3cm]{empty.eps}
+      \caption{Vibrational stability equation of state
+               $S_{\mathrm{vib}}(\lg e, \lg \rho)$.
+               $>0$ means vibrational stability.
+              }
+         \label{FigVibStab}
+   \end{figure}
+%
+%_____________________________________________________________
+%
+%_____________________________________________________________
+%                                Figure with a new BoundingBox 
+%-------------------------------------------------------------
+   \begin{figure}
+   \centering
+   \includegraphics[bb=10 20 100 300,width=3cm,clip]{empty.eps}
+      \caption{Vibrational stability equation of state
+               $S_{\mathrm{vib}}(\lg e, \lg \rho)$.
+               $>0$ means vibrational stability.
+              }
+         \label{FigVibStab}
+   \end{figure}
+%
+%_____________________________________________________________
+%
+%_____________________________________________________________
+%                                      The "resizebox" command 
+%-------------------------------------------------------------
+   \begin{figure}
+   \resizebox{\hsize}{!}
+            {\includegraphics[bb=10 20 100 300,clip]{empty.eps}
+      \caption{Vibrational stability equation of state
+               $S_{\mathrm{vib}}(\lg e, \lg \rho)$.
+               $>0$ means vibrational stability.
+              }
+         \label{FigVibStab}
+   \end{figure}
+%
+%______________________________________________________________
+%
+%_____________________________________________________________
+%                                             Two column Figure 
+%-------------------------------------------------------------
+   \begin{figure*}
+   \resizebox{\hsize}{!}
+            {\includegraphics[bb=10 20 100 300,clip]{empty.eps}
+      \caption{Vibrational stability equation of state
+               $S_{\mathrm{vib}}(\lg e, \lg \rho)$.
+               $>0$ means vibrational stability.
+              }
+         \label{FigVibStab}
+   \end{figure*}
+%
+%______________________________________________________________
+%
+%_____________________________________________________________
+%                                             Simple A&A Table
+%_____________________________________________________________
+%
+\begin{table}
+\caption{Nonlinear Model Results}             % title of Table
+\label{table:1}      % is used to refer this table in the text
+\centering                          % used for centering table
+\begin{tabular}{c c c c}        % centered columns (4 columns)
+\hline\hline                 % inserts double horizontal lines
+HJD & $E$ & Method\#2 & Method\#3 \\    % table heading 
+\hline                        % inserts single horizontal line
+   1 & 50 & $-837$ & 970 \\      % inserting body of the table
+   2 & 47 & 877    & 230 \\
+   3 & 31 & 25     & 415 \\
+   4 & 35 & 144    & 2356 \\
+   5 & 45 & 300    & 556 \\ 
+\hline                                   %inserts single line
+\end{tabular}
+\end{table}
+%
+%_____________________________________________________________
+%                                             Two column Table 
+%_____________________________________________________________
+%
+\begin{table*}
+\caption{Nonlinear Model Results}             
+\label{table:1}      
+\centering          
+\begin{tabular}{c c c c l l l }     % 7 columns 
+\hline\hline       
+                      % To combine 4 columns into a single one 
+HJD & $E$ & Method\#2 & \multicolumn{4}{c}{Method\#3}\\ 
+\hline                    
+   1 & 50 & $-837$ & 970 & 65 & 67 & 78\\  
+   2 & 47 & 877    & 230 & 567& 55 & 78\\
+   3 & 31 & 25     & 415 & 567& 55 & 78\\
+   4 & 35 & 144    & 2356& 567& 55 & 78 \\
+   5 & 45 & 300    & 556 & 567& 55 & 78\\
+\hline                  
+\end{tabular}
+\end{table*}
+%
+%-------------------------------------------------------------
+%                                          Table with notes 
+%-------------------------------------------------------------
+%
+% A single note
+\begin{table}
+\caption{\label{t7}Spectral types and photometry for stars in the
+  region.}
+\centering
+\begin{tabular}{lccc}
+\hline\hline
+Star&Spectral type&RA(J2000)&Dec(J2000)\\
+\hline
+69           &B1\,V     &09 15 54.046 & $-$50 00 26.67\\
+49           &B0.7\,V   &*09 15 54.570& $-$50 00 03.90\\
+LS~1267~(86) &O8\,V     &09 15 52.787&11.07\\
+24.6         &7.58      &1.37 &0.20\\
+\hline
+LS~1262      &B0\,V     &09 15 05.17&11.17\\
+MO 2-119     &B0.5\,V   &09 15 33.7 &11.74\\
+LS~1269      &O8.5\,V   &09 15 56.60&10.85\\
+\hline
+\end{tabular}
+\tablefoot{The top panel shows likely members of Pismis~11. The second
+panel contains likely members of Alicante~5. The bottom panel
+displays stars outside the clusters.}
+\end{table}
+%
+% More notes
+%
+\begin{table}
+\caption{\label{t7}Spectral types and photometry for stars in the
+  region.}
+\centering
+\begin{tabular}{lccc}
+\hline\hline
+Star&Spectral type&RA(J2000)&Dec(J2000)\\
+\hline
+69           &B1\,V     &09 15 54.046 & $-$50 00 26.67\\
+49           &B0.7\,V   &*09 15 54.570& $-$50 00 03.90\\
+LS~1267~(86) &O8\,V     &09 15 52.787&11.07\tablefootmark{a}\\
+24.6         &7.58\tablefootmark{1}&1.37\tablefootmark{a}   &0.20\tablefootmark{a}\\
+\hline
+LS~1262      &B0\,V     &09 15 05.17&11.17\tablefootmark{b}\\
+MO 2-119     &B0.5\,V   &09 15 33.7 &11.74\tablefootmark{c}\\
+LS~1269      &O8.5\,V   &09 15 56.60&10.85\tablefootmark{d}\\
+\hline
+\end{tabular}
+\tablefoot{The top panel shows likely members of Pismis~11. The second
+panel contains likely members of Alicante~5. The bottom panel
+displays stars outside the clusters.\\
+\tablefoottext{a}{Photometry for MF13, LS~1267 and HD~80077 from
+Dupont et al.}
+\tablefoottext{b}{Photometry for LS~1262, LS~1269 from
+Durand et al.}
+\tablefoottext{c}{Photometry for MO2-119 from
+Mathieu et al.}
+}
+\end{table}
+%
+%-------------------------------------------------------------
+%                                       Table with references 
+%-------------------------------------------------------------
+%
+\begin{table*}[h]
+ \caption[]{\label{nearbylistaa2}List of nearby SNe used in this work.}
+\begin{tabular}{lccc}
+ \hline \hline
+  SN name &
+  Epoch &
+ Bands &
+  References \\
+ &
+  (with respect to $B$ maximum) &
+ &
+ \\ \hline
+1981B   & 0 & {\it UBV} & 1\\
+1986G   &  $-$3, $-$1, 0, 1, 2 & {\it BV}  & 2\\
+1989B   & $-$5, $-$1, 0, 3, 5 & {\it UBVRI}  & 3, 4\\
+1990N   & 2, 7 & {\it UBVRI}  & 5\\
+1991M   & 3 & {\it VRI}  & 6\\
+\hline
+\noalign{\smallskip}
+\multicolumn{4}{c}{ SNe 91bg-like} \\
+\noalign{\smallskip}
+\hline
+1991bg   & 1, 2 & {\it BVRI}  & 7\\
+1999by   & $-$5, $-$4, $-$3, 3, 4, 5 & {\it UBVRI}  & 8\\
+\hline
+\noalign{\smallskip}
+\multicolumn{4}{c}{ SNe 91T-like} \\
+\noalign{\smallskip}
+\hline
+1991T   & $-$3, 0 & {\it UBVRI}  &  9, 10\\
+2000cx  & $-$3, $-$2, 0, 1, 5 & {\it UBVRI}  & 11\\ %
+\hline
+\end{tabular}
+\tablebib{(1)~\citet{branch83};
+(2) \citet{phillips87}; (3) \citet{barbon90}; (4) \citet{wells94};
+(5) \citet{mazzali93}; (6) \citet{gomez98}; (7) \citet{kirshner93};
+(8) \citet{patat96}; (9) \citet{salvo01}; (10) \citet{branch03};
+(11) \citet{jha99}.
+}
+\end{table}
+%_____________________________________________________________
+%                      A rotated Two column Table in landscape  
+%-------------------------------------------------------------
+\begin{sidewaystable*}
+\caption{Summary for ISOCAM sources with mid-IR excess 
+(YSO candidates).}\label{YSOtable}
+\centering
+\begin{tabular}{crrlcl} 
+\hline\hline             
+ISO-L1551 & $F_{6.7}$~[mJy] & $\alpha_{6.7-14.3}$ 
+& YSO type$^{d}$ & Status & Comments\\
+\hline
+  \multicolumn{6}{c}{\it New YSO candidates}\\ % To combine 6 columns into a single one
+\hline
+  1 & 1.56 $\pm$ 0.47 & --    & Class II$^{c}$ & New & Mid\\
+  2 & 0.79:           & 0.97: & Class II ?     & New & \\
+  3 & 4.95 $\pm$ 0.68 & 3.18  & Class II / III & New & \\
+  5 & 1.44 $\pm$ 0.33 & 1.88  & Class II       & New & \\
+\hline
+  \multicolumn{6}{c}{\it Previously known YSOs} \\
+\hline
+  61 & 0.89 $\pm$ 0.58 & 1.77 & Class I & \object{HH 30} & Circumstellar disk\\
+  96 & 38.34 $\pm$ 0.71 & 37.5& Class II& MHO 5          & Spectral type\\
+\hline
+\end{tabular}
+\end{sidewaystable*}
+%_____________________________________________________________
+%                      A rotated One column Table in landscape  
+%-------------------------------------------------------------
+\begin{sidewaystable}
+\caption{Summary for ISOCAM sources with mid-IR excess 
+(YSO candidates).}\label{YSOtable}
+\centering
+\begin{tabular}{crrlcl} 
+\hline\hline             
+ISO-L1551 & $F_{6.7}$~[mJy] & $\alpha_{6.7-14.3}$ 
+& YSO type$^{d}$ & Status & Comments\\
+\hline
+  \multicolumn{6}{c}{\it New YSO candidates}\\ % To combine 6 columns into a single one
+\hline
+  1 & 1.56 $\pm$ 0.47 & --    & Class II$^{c}$ & New & Mid\\
+  2 & 0.79:           & 0.97: & Class II ?     & New & \\
+  3 & 4.95 $\pm$ 0.68 & 3.18  & Class II / III & New & \\
+  5 & 1.44 $\pm$ 0.33 & 1.88  & Class II       & New & \\
+\hline
+  \multicolumn{6}{c}{\it Previously known YSOs} \\
+\hline
+  61 & 0.89 $\pm$ 0.58 & 1.77 & Class I & \object{HH 30} & Circumstellar disk\\
+  96 & 38.34 $\pm$ 0.71 & 37.5& Class II& MHO 5          & Spectral type\\
+\hline
+\end{tabular}
+\end{sidewaystable}
+%
+%_____________________________________________________________
+%                              Table longer than a single page  
+%-------------------------------------------------------------
+% All long tables will be placed automatically at the end, after 
+%                                        \end{thebibliography}
+%
+\begin{longtab}
+\begin{longtable}{lllrrr}
+\caption{\label{kstars} Sample stars with absolute magnitude}\\
+\hline\hline
+Catalogue& $M_{V}$ & Spectral & Distance & Mode & Count Rate \\
+\hline
+\endfirsthead
+\caption{continued.}\\
+\hline\hline
+Catalogue& $M_{V}$ & Spectral & Distance & Mode & Count Rate \\
+\hline
+\endhead
+\hline
+\endfoot
+%%
+Gl 33    & 6.37 & K2 V & 7.46 & S & 0.043170\\
+Gl 66AB  & 6.26 & K2 V & 8.15 & S & 0.260478\\
+Gl 68    & 5.87 & K1 V & 7.47 & P & 0.026610\\
+         &      &      &      & H & 0.008686\\
+Gl 86 
+\footnote{Source not included in the HRI catalog. See Sect.~5.4.2 for details.}
+         & 5.92 & K0 V & 10.91& S & 0.058230\\
+\end{longtable}
+\end{longtab}
+%
+%_____________________________________________________________
+%                              Table longer than a single page
+%                                             and in landscape 
+%  In the preamble, use:       \usepackage{lscape}
+%-------------------------------------------------------------
+% All long tables will be placed automatically at the end, after
+%                                        \end{thebibliography}
+%
+\begin{longtab}
+\begin{landscape}
+\begin{longtable}{lllrrr}
+\caption{\label{kstars} Sample stars with absolute magnitude}\\
+\hline\hline
+Catalogue& $M_{V}$ & Spectral & Distance & Mode & Count Rate \\
+\hline
+\endfirsthead
+\caption{continued.}\\
+\hline\hline
+Catalogue& $M_{V}$ & Spectral & Distance & Mode & Count Rate \\
+\hline
+\endhead
+\hline
+\endfoot
+%%
+Gl 33    & 6.37 & K2 V & 7.46 & S & 0.043170\\
+Gl 66AB  & 6.26 & K2 V & 8.15 & S & 0.260478\\
+Gl 68    & 5.87 & K1 V & 7.47 & P & 0.026610\\
+         &      &      &      & H & 0.008686\\
+Gl 86
+\footnote{Source not included in the HRI catalog. See Sect.~5.4.2 for details.}
+         & 5.92 & K0 V & 10.91& S & 0.058230\\
+\end{longtable}
+\end{landscape}
+\end{longtab}
+%
+% Online Material
+%_____________________________________________________________
+%        Online appendices have to be placed at the end, after
+%                                        \end{thebibliography}
+%-------------------------------------------------------------
+\end{thebibliography}
+
+\Online
+
+\begin{appendix} %First online appendix
+\section{Background galaxy number counts and shear noise-levels}
+Because the optical images used in this analysis...
+
+\begin{figure*}
+\centering
+\includegraphics[width=16.4cm,clip]{1787f24.ps}
+\caption{Plotted above...}
+\label{appfig}
+\end{figure*}
+
+Because the optical images...
+\end{appendix}
+
+\begin{appendix} %Second online appendix
+These studies, however, have faced...
+\end{appendix}
+
+\end{document}
+%
+%_____________________________________________________________
+%        Some tables or figures are in the printed version and
+%                      some are only in the electronic version
+%-------------------------------------------------------------
+%
+% Leave all the tables or figures in the text, at their right place 
+% and use the commands \onlfig{} and \onltab{}. These elements
+% will be automatically placed at the end, in the section
+% Online material.
+
+\documentclass{aa}
+...
+\begin{document}
+text of the paper...
+\begin{figure*}%f1
+\includegraphics[width=10.9cm]{1787f01.eps}
+\caption{Shown in greyscale is a...}
+\label{cl12301}}
+\end{figure*}
+...
+from the intrinsic ellipticity distribution.
+% Figure 2 available electronically only
+\onlfig{
+\begin{figure*}%f2
+\includegraphics[width=11.6cm]{1787f02.eps}
+\caption {Shown in greyscale...}
+\label{cl1018}
+\end{figure*}
+}
+
+% Figure 3 available electronically only
+\onlfig{
+\begin{figure*}%f3
+\includegraphics[width=11.2cm]{1787f03.eps}
+\caption{Shown in panels...}
+\label{cl1059}
+\end{figure*}
+}
+
+\begin{figure*}%f4
+\includegraphics[width=10.9cm]{1787f04.eps}
+\caption{Shown in greyscale is...}
+\label{cl1232}}
+\end{figure*}
+
+\begin{table}%t1
+\caption{Complexes characterisation.}\label{starbursts}
+\centering
+\begin{tabular}{lccc}
+\hline \hline
+Complex & $F_{60}$ & 8.6 &  No. of  \\
+...
+\hline
+\end{tabular}
+\end{table}
+The second method produces...
+
+% Figure 5 available electronically only
+\onlfig{
+\begin{figure*}%f5
+\includegraphics[width=11.2cm]{1787f05.eps}
+\caption{Shown in panels...}
+\label{cl1238}}
+\end{figure*}
+}
+
+As can be seen, in general the deeper...
+% Table 2 available electronically only
+\onltab{
+\begin{table*}%t2
+\caption{List of the LMC stellar complexes...}\label{Properties}
+\centering
+\begin{tabular}{lccccccccc}
+\hline  \hline
+Stellar & RA & Dec & ...
+...
+\hline
+\end{tabular}
+\end{table*}
+}
+
+% Table 3 available electronically only
+\onltab{
+\begin{table*}%t3
+\caption{List of the derived...}\label{IrasFluxes}
+\centering
+\begin{tabular}{lcccccccccc}
+\hline \hline
+Stellar & $f12$ & $L12$ &...
+...
+\hline
+\end{tabular}
+\end{table*}
+}
+%
+%-------------------------------------------------------------
+%     For the online material, table longer than a single page
+%                 In the preamble for landscape case, use : 
+%                                          \usepackage{lscape}
+%-------------------------------------------------------------
+\documentclass{aa}
+\usepackage[varg]{txfonts}
+\usepackage{graphicx}
+\usepackage{lscape}
+
+\begin{document}
+text of the paper
+% Table will be print automatically at the end, in the section Online material.
+\onllongtab{
+\begin{longtable}{lrcrrrrrrrrl}
+\caption{Line data and abundances ...}\\
+\hline
+\hline
+Def & mol & Ion & $\lambda$ & $\chi$ & $\log gf$ & N & e &  rad & $\delta$ & $\delta$ 
+red & References \\
+\hline
+\endfirsthead
+\caption{Continued.} \\
+\hline
+Def & mol & Ion & $\lambda$ & $\chi$ & $\log gf$ & B & C &  rad & $\delta$ & $\delta$ 
+red & References \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+A & CH & 1 &3638 & 0.002 & $-$2.551 &  &  &  & $-$150 & 150 &  Jorgensen et al. (1996) \\                    
+\end{longtable}
+}% End onllongtab
+
+% Or for landscape, large table:
+
+\onllongtab{
+\begin{landscape}
+\begin{longtable}{lrcrrrrrrrrl}
+...
+\end{longtable}
+\end{landscape}
+}% End onllongtab
