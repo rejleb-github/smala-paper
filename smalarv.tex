@@ -34,6 +34,8 @@
 %\usepackage{afterpage}
 \usepackage{capt-of}% or use the larger `caption` package
 \usepackage{multirow}
+\usepackage{color}
+\def\memohr#1{\color{blue}$HR[${\bf #1}$]$ \color{black}}
 
 
 %\usepackage[options]{hyperref}
@@ -68,7 +70,13 @@
    Department of Astronomy, University of Florida, 211 Bryant Space Science Center, Gainesville, FL 32611, USA
              }
 
-   \date{Draft - April 12 2017}
+   \date{Draft - April 12 2017
+       \memohr{A few general notes:\\
+           1) AandA charges publication fees. MNRAS does not. For that reason I like MNRAS.\\
+           2) Did you choose the abstract with subheadings on purpose? This kind of abstract is not universally appreciated in the community. \\
+           3) In tex files, I find it useful to have one line per sentence. This makes it easy to move sentences around.
+       }
+   }
 
 % \abstract{}{}{}{}{} 
 % 5 {} token are mandatory
@@ -78,11 +86,11 @@
   % {} leave it empty if necessary  
    {In recent years, thousands of exoplanets of been discovered. Given this large amount of data, it is imperative that we optimize our ability to perform analysis. One of the techniques who are used to discover or analyze exoplanets are radial velocities surveys. In order to fit this type data, Markov Chain Monte Carlo (MCMC) methods are often applied.}
   % aims heading (mandatory)
-   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. This algorithm makes use of more costly but uncorrelated sampling to increase overall efficiency.}
+   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. This algorithm produces less correlated samples but each proposal is more costly. We aim to if this leads to an increased overall efficiency or not.}
   % methods heading (mandatory)
-   {The performance we obtain is compared with the performance of another standard MCMC, the affine invariant sampler.}
+   {The performance we obtain is compared with the performance of another standard MCMC, the affine invariant sampler. \memohr{What does this have to do with methods? It also contradicts the results below.}}
   % results heading (mandatory)
-   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large. This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler}
+   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large. This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler \memohr{Isn't this the same as the last sentence?}.}
   % conclusions heading (optional), leave it empty if necessary 
    {}
 
