@@ -104,9 +104,9 @@ We do this using time normalized effective sample size as our measure for a few 
 }
   % results heading (mandatory)
    {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large.
-This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler.
+This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method has similar or worse autocorrelation times compared to the affine invariant sampler. This is most likely due to the complexity of the phase space.
 \memohr{Isn't this the same as the last sentence?}
-\memorl{There's a subtle difference which is discussed at length in the later parts. Not only does the computational cost go up, the effective sample size/autocorrelation time is practically the same in addition to that. In the discussion I propose some reasoning why the autocorrelation times aren't better than emcee at this higher dim...this is the discussion we had about collisions/etc}.
+\memorl{There's a subtle difference which is discussed at length in the later parts. Not only does the computational cost go up, the effective sample size/autocorrelation time is practically the same in addition to that... Addressed by mentioning the complexity of the phase space.}.
 }
   % conclusions heading (optional), leave it empty if necessary 
    {}
@@ -147,24 +147,23 @@ These results are presented in section \ref{results}.
 The Langevin method we chose in our implementation is the Simplified manifold Metropolis-Adjusted Langevin Algorithm (SMALA). 
 The SMALA algorithm simplifies the general N-dimensional MALA algorithm by assuming the space is mostly flat and eliminating the terms in the proposal which account for the curvature of the space \citep{Girolami2011}.
 \memohr{I'm not sure this is a correct description of SMALA. Clearly, we take into account the curvature of the likelihood space.}
-\memorl{We look at the curvature of the likelihood function but not the curvature of the space it's in. Technically, likelihood space is an abuse of language... which I am also guilty of! Specifically, Girolami drops the Christoffel symbols which would be required for a generic Riemanian manifold, here we just assume the likelihood function lives in a Cartesian coordinate (uncurved coordinate for the space) so these terms are 0, hence `simplified'.}
+\memorl{We look at the curvature of the likelihood function which lives inside a certain space but the curvature of the space it's in is not considered. Specifically, Girolami drops the Christoffel symbols which would be required for a generic Riemanian manifold, here we just assume the likelihood function lives in a Cartesian coordinate (uncurved coordinate for the space) so these terms are 0, hence `simplified'.}
 
 With this simplification, the SMALA approach can be explained with a simple example. 
 Given a Gaussian likelihood space, the Metropolis-Hastings algorithm will randomly wander through the distribution, favoring movement towards the maximum likelihood.
-Rather than doing random jumps, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. 
-The SMALA method will use the first and second derivatives of the sampler to project a parabola. 
-By jumping in close proximity of the maximum of this parabola, we are able to quickly cross much of the likelihood space. 
-The exact position of the jump is randomized to sample the space effectively.
+Rather than doing random proposals, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. 
+The SMALA method will use the first and second derivatives of the sampler to project a parabola and sample in close proximity of the maximum. 
 \memohr{This sounds like we're just doing an interation of Newton's method. Need to mention that SMALA does not really jump to the maximum.}
-\memorl{Addressed.}
-This is shown very well in the sample problems of \cite{Girolami2011}. 
+\memorl{Addressed. We *sample* near the maximum.}
 Depending on how good this parabolic approximation is, we can expect two benefits.
 \begin{itemize}
 \item Reaching the neighborhood of the maximum likelihood with fewer steps.
-\item Highly uncorrelated samples.
+\item Highly uncorrelated samples since we make larger jumps.
 \end{itemize}
-However, this comes with the computational cost of calculating the gradient and Hessian of the likelihood function, which will scale in $\mathcal{O}(n^2)$.
+These properties are shown very well in the sample problems of \cite{Girolami2011}. 
+However, this benefit comes with the computational cost of calculating the gradient and Hessian of the likelihood function, which will scale in $\mathcal{O}(n^2)$, $n$ being the dimensionality of the problem. 
 \memohr{define $n$}
+\memorl{Addressed.}
 
 We will compare the algorithm with the affine invariant sampling MCMC from \cite{Goodman2010} \memohr{Note that that FM2013 paper is mainly an implementation of the affine invariant sample. The only thing they add is splitting the sampler into two pools which allows for parallelization among other things. Should cite the original paper here.} \memorl{Good point, addressed.} and an implementation of Hamiltonian Monte Carlo (abbreviated as HMC) \citep{Duane1987}.
 While we created our own python implementation of SMALA, the affine invariant MCMC has its own python package implementation known as EMCEE which we have used in our framework. 
@@ -178,13 +177,16 @@ This will allow generating a new proposal based on how the state or `particle' w
 Various steps were taken to maximize the numerical stability and usability of the MCMC for fitting exoplanets. Some were directly implemented into \texttt{Rebound}, while others were implemented at a higher level within our framework.
 
 \subsubsection{\texttt{Rebound} Side}\label{analytical}
-In the framework of traditional orbital elements certain derivatives be undefined. For example, the derivative of the argument of periapsis, $\omega$, is undefined when the eccentricity is zero. To remedy this issue we use analytical coordinates. The coordinates by \cite{Pl2009} are trivially analytical since they use trigonometric functions, and are thus infinitely differentiable. In his paper, we find transformations which maps the traditional orbital elements unto an alternative set, $a, e, i, \omega, \Omega, M \to a, h, k, i_x, i_y, \lambda$ where $h$ and $k$ are the Lagrangian orbital elements, and the inclination and longitude are decomposed into $i_x$, $i_y$, and $\lambda$ gives the mean longitude. The equations describing this transformation  can be found in the original paper. 
+In the framework of traditional orbital elements certain derivatives be undefined. For example, the derivative of the argument of periapsis, $\omega$, is undefined when the eccentricity is zero. 
+To avoid this we use the coordinates defined by \cite{Pl2009} which are trivially analytical since they use trigonometric functions, and are thus infinitely differentiable. 
+In his paper, we find transformations which maps the traditional orbital elements unto an alternative set, $a, e, i, \omega, \Omega, M \to a, h, k, i_x, i_y, \lambda$ where $h$ and $k$ are the Lagrangian orbital elements, and the inclination and longitude are decomposed into $i_x$, $i_y$, and $\lambda$ gives the mean longitude. 
+The equations describing this transformation can be found in the original paper. 
 \memohr{This is basically just the chain rule. I don't think this deserves a discussion here.}
-\memorl{I just list the variables of the coordinate change since I think that's very basic info that's convenient for the reader. It provides some idea of the coordinate without going in detail. Naturally if the reader cares about the details of the chain rule they can just check Pal's paper...}
+\memorl{Cleaned up a bit. We're good here.}
 
-These coordinates come with a caveat, as there are some derivatives undefined when there are more than two planets. This is a special case, when two planets are exactly retrograde. Since this special case is a rather unnatural configuration, it poses no issues in practicality.
+These coordinates come with a caveat, as all derivatives are undefined when considering a perfectly retrograde planet. However in such a case, the coordinate system can be reoriented or the planet can be offset by an arbitrarily small inclination.
 \memohr{I don't understand this paragraph}
-\memorl{This is the one case where we get undefined derivatives... two perfectly retrograde orbits. We definitely talked about this when we implemented it and quickly said that it was no problem in any real system. If memory serves my right, this would be the second derivatives with one inclination of each planet ($\partial i_{x1} \partial i_{x2}$), though I could be misremembering.}
+\memorl{Fixed. All derivatives break in the retrograde case, but in such a scenario the system can be reoriented.}
 
 We combine these coordinates with the variational equations of \texttt{Rebound} to calculate the likelihood gradient and Hessian. 
 These allow us to integrate the derivatives along with the dynamical system with very high numerical accuracy. 
