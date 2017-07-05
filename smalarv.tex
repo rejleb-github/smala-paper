@@ -34,6 +34,8 @@
 %\usepackage{afterpage}
 \usepackage{capt-of}% or use the larger `caption` package
 \usepackage{multirow}
+\usepackage{color}
+\def\memohr#1{\color{blue}$HR[${\bf #1}$]$ \color{black}}
 
 
 %\usepackage[options]{hyperref}
@@ -68,7 +70,13 @@
    Department of Astronomy, University of Florida, 211 Bryant Space Science Center, Gainesville, FL 32611, USA
              }
 
-   \date{Draft - April 12 2017}
+   \date{Draft - April 12 2017
+       \memohr{A few general notes:\\
+           1) AandA charges publication fees. MNRAS does not. For that reason I like MNRAS.\\
+           2) Did you choose the abstract with subheadings on purpose? This kind of abstract is not universally appreciated in the community. \\
+           3) In tex files, I find it useful to have one line per sentence. This makes it easy to move sentences around. It also helps git to make reasonable diffs.
+       }
+   }
 
 % \abstract{}{}{}{}{} 
 % 5 {} token are mandatory
@@ -78,11 +86,11 @@
   % {} leave it empty if necessary  
    {In recent years, thousands of exoplanets of been discovered. Given this large amount of data, it is imperative that we optimize our ability to perform analysis. One of the techniques who are used to discover or analyze exoplanets are radial velocities surveys. In order to fit this type data, Markov Chain Monte Carlo (MCMC) methods are often applied.}
   % aims heading (mandatory)
-   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. This algorithm makes use of more costly but uncorrelated sampling to increase overall efficiency.}
+   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. This algorithm produces less correlated samples but each proposal is more costly. We aim to if this leads to an increased overall efficiency or not.}
   % methods heading (mandatory)
-   {The performance we obtain is compared with the performance of another standard MCMC, the affine invariant sampler.}
+   {The performance we obtain is compared with the performance of another standard MCMC, the affine invariant sampler. \memohr{What does this have to do with methods? It also contradicts the results below.}}
   % results heading (mandatory)
-   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large. This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler}
+   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large. This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler \memohr{Isn't this the same as the last sentence?}.}
   % conclusions heading (optional), leave it empty if necessary 
    {}
 
@@ -101,39 +109,48 @@ With thousands of exoplanets having already been discovered \cite{exoArchive}, m
 This is what Langevin MCMC methods do by using derivative information of the likelihood space. These types of techniques have never been implemented in an exoplanet context, and pose various technical challenges. These are discussed at length in section \ref{setup}. To test Langevin methods we require the derivative information, thus we need an analytical coordinate system described by \cite{Pl2009} such that these values are always defined. This calculation needs to be as efficient as possible, so we use an implementation of \texttt{Rebound}'s variational equations from \cite{Rein2016} to compute the $\chi^2$ likelihood derivative. Alongside this, we carefully selected the hyperparameters of the MCMC methods, as explained in section \ref{hyper}.
 
 In this paper we compare our implementation with another MCMC by using the CPU time-normalized effective sample size (shortened to efficiency). We use 3 sample fitting problems to compare the algorithms, where we initialize the MCMC with best known, or true initial conditions. These have dimensions $N=1$, $N=4$, and $N=10$, ranging from the most simplistic case to using real data from a multi-planet system which is in resonance. These results are presented in section \ref{results}.
+
+\memohr{This section reads really well!}
  
 \section{Methods and Setup}\label{setup}
 \subsection{MCMC Methods}
-The Langevin method we chose in our implementation is the Simplified manifold Metropolis-Adjusted Langevin Algorithm (SMALA). The SMALA algorithm simplifies the general N-dimensional MALA algorithm by assuming the space is mostly flat and eliminating the terms in the proposal which account for the curvature of the space \cite{Girolami2011}.
+The Langevin method we chose in our implementation is the Simplified manifold Metropolis-Adjusted Langevin Algorithm (SMALA). The SMALA algorithm simplifies the general N-dimensional MALA algorithm by assuming the space is mostly flat and eliminating the terms in the proposal which account for the curvature of the space \citep{Girolami2011}.
+\memohr{I'm not sure this is a correct description of SMALA. Clearly, we take into account the curvature of the likelihood space.}
 
 With this simplification, the SMALA approach can be explained with a simple example. Given a Gaussian likelihood space, the Metropolis-Hastings algorithm will randomly wander through the distribution, favoring movement towards the maximum likelihood.
-Rather than doing random jumps, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. The SMALA method will use the first and second derivatives of the sampler to project a parabola. By jumping to the maximum of this parabola, we are able to quickly cross much of the likelihood space. This is shown very well in the sample problems of \cite{Girolami2011}. Depending on how good this parabolic approximation is, we can expect two benefits.
+Rather than doing random jumps, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. The SMALA method will use the first and second derivatives of the sampler to project a parabola. By jumping to the maximum of this parabola, we are able to quickly cross much of the likelihood space. 
+\memohr{This sounds like we're just doing an interation of Newton's method. Need to mention that SMALA does not really jump to the maximum.}
+This is shown very well in the sample problems of \cite{Girolami2011}. Depending on how good this parabolic approximation is, we can expect two benefits.
 \begin{itemize}
-\item Reaching the neighborhood of the maximum likelihood within fewer steps.
+\item Reaching the neighborhood of the maximum likelihood with fewer steps.
 \item Highly uncorrelated samples.
 \end{itemize}
-However, this comes with the computational cost of calculating the Hessian, which will scale in $\mathcal{O}(n^2)$.
+However, this comes with the computational cost of calculating the gradient and Hessian of the likelihood function, which will scale in $\mathcal{O}(n^2)$.
+\memohr{define $n$}
 
-We will compare the algorithm with the affine invariant sampling MCMC from \cite{Foreman-Mackey2013} and an implementation of Hamiltonian Monte Carlo (abbreviated as HMC) \citep{Duane1987}. While we created our own python implementation of SMALA, the affine invariant MCMC has its own python package implementation known as EMCEE which we have used in our framework. This MCMC uses an ensemble of walkers to make linear proposals based on certain `moves'. In this work we use simple `stretch moves' which are described in full detail by \cite{Foreman-Mackey2013}. The other MCMC we compare with is the HMC which uses Hamiltonian mechanics to create new proposals. For a particular state an arbitrary velocity kick is given, drawn from a standard normal distribution. This will allow generating a new proposal based on how the state or `particle' will travel on the likelihood function as described by Hamiltonian mechanics. We implement a leapfrog method for integrating the state vector forward.
+We will compare the algorithm with the affine invariant sampling MCMC from \cite{Foreman-Mackey2013} \memohr{Note that that FM2013 paper is mainly an implementation of the affine invariant sample. The only thing they add is splitting the sampler into two pools which allows for parallelization among other things. Should cite the original paper here.} and an implementation of Hamiltonian Monte Carlo (abbreviated as HMC) \citep{Duane1987}. While we created our own python implementation of SMALA, the affine invariant MCMC has its own python package implementation known as EMCEE which we have used in our framework. This MCMC uses an ensemble of walkers to make linear proposals based on certain `moves'. In this work we use simple `stretch moves' which are described in full detail by \cite{Foreman-Mackey2013}. The other MCMC we compare with is the HMC which uses Hamiltonian mechanics to create new proposals. For a particular state an arbitrary velocity kick is given, drawn from a standard normal distribution. This will allow generating a new proposal based on how the state or `particle' will travel on the likelihood function as described by Hamiltonian mechanics. We implement a leapfrog method for integrating the state vector forward.
 
 \subsection{Measures to Ensure Stability and Correctness}
 Various steps were taken to maximize the numerical stability and usability of the MCMC for fitting exoplanets. Some were directly implemented into \texttt{Rebound}, while others were implemented at a higher level within our framework.
 
 \subsubsection{\texttt{Rebound} Side}\label{analytical}
-In the framework of traditional orbital elements certain derivatives be undefined. For example, the derivative of the argument of periapsis, $\omega$, is undefined when the eccentricity is zero. To remedy this issue we use analytical coordinates. The coordinates by \cite{Pl2009} are trivially analytical since they use trigonometric functions, and are thus infinitely differentiable. In his paper, we find transformations which maps the traditional orbital elements unto an alternative set, $a, e, i, \omega, \Omega, M \to a, h, k, i_x, i_y, \lambda$ where $h$ and $k$ are the Lagrangian orbital elements, and the inclination and longitude are decomposed into $i_x$, $i_y$, and $lambda$ gives the mean longitude. The equations describing this transformation  can be found in the original paper. 
+In the framework of traditional orbital elements certain derivatives be undefined. For example, the derivative of the argument of periapsis, $\omega$, is undefined when the eccentricity is zero. To remedy this issue we use analytical coordinates. The coordinates by \cite{Pl2009} are trivially analytical since they use trigonometric functions, and are thus infinitely differentiable. In his paper, we find transformations which maps the traditional orbital elements unto an alternative set, $a, e, i, \omega, \Omega, M \to a, h, k, i_x, i_y, \lambda$ where $h$ and $k$ are the Lagrangian orbital elements, and the inclination and longitude are decomposed into $i_x$, $i_y$, and $\lambda$ gives the mean longitude. The equations describing this transformation  can be found in the original paper. 
+\memohr{This is basically just the chain rule. I don't think this deserves a discussion here.}
 
 These coordinates come with a caveat, as there are some derivatives undefined when there are more than two planets. This is a special case, when two planets are exactly retrograde. Since this special case is a rather unnatural configuration, it poses no issues in practicality.
+\memohr{I don't understand this paragraph}
 
 We combine these coordinates with the variational equations of \texttt{Rebound} to calculate the likelihood gradient and Hessian. These allow us to integrate the derivatives along with the dynamical system with very high numerical accuracy. These variational equations are initialized such to provide the response of the system with respect to the velocity component of the primary object. For example, a first order variation we could get would be $\frac{dv_x}{dh}$, and for a second order we could obtain $\frac{d^2v_x}{dhda}$. Given every one of these combinations we can build the $\chi^2$ Hessian with respect to the radial velocity measurements.
 
 In order to handle close encounters and collisions we define a minimum distance in terms of Hill radii of the largest planet, shortened to largest hill radii. For our implementation in \texttt{Rebound}, if any exoplanets are within 2 times the largest hill radii of each other, the simulation will exit and return a likelihood of $0$ for this particular system. 
 
 We assume that any planetary system which is observed today must necessarily be long-term stable such that it formed. Unfortunately it is not computationally feasible to test the long-term stability of every sample, so we settle for the short-term stability measure described above.
+\memohr{I think the last to parasgrpahs can be summarized as follows: "If two planets come within two Hill radii of each other, the system is considered unstable and a likelihood of 0 is returned.}
 
 \subsubsection{Python Side}
-In the python front end we use a few tricks to improve the numerical stability. To handle very low likelihoods without numerical errors growing large, we work in log-likelihood. In addition to this, we avoid correlation bias between the semi-major axis and the mean longitude by making our integrations two-sided, centered on time $t=0$. This correlation stems from the fact that a small change in period can allow `wiggle room' for a small change in phase, unless we allow this small perturbation to affect the data symmetrically.
+In the python front end we use a few tricks to improve the numerical stability. To handle very low likelihoods without numerical errors growing large, we work in log-likelihood. In addition to this, we avoid correlation bias between the semi-major axis and the mean longitude by making our integrations two-sided, centered on time $t=0$ \memohr{I don't think this is clear. Maybe reference Eric's paper where he used this}. This correlation stems from the fact that a small change in period can allow `wiggle room' for a small change in phase, unless we allow this small perturbation to affect the data symmetrically.
 
-In order to avoid instability during the inversion of the Hessian we take the soft absolute value of the eigenvalues. This function, called softabs, is described in \cite{softabs}. This function gives the same behavior as an absolute value operator except near $0$ where it is smoothed out according to a scaling variable $\alpha$.An eigenvalue of $0$ assume a value of $1/\alpha$ instead of $0$, which would be problematic, when we use this function.
+In order to avoid instability during the inversion of the Hessian we take the soft absolute value of the eigenvalues. This function, called softabs, is described in \cite{softabs}. \memohr{The 'soft absolute value of the eigenvalues' is not very clear. Try to be more precise.} This function gives the same behavior as an absolute value operator except near $0$ where it is smoothed out according to a scaling variable $\alpha$.An eigenvalue of $0$ assume a value of $1/\alpha$ instead of $0$, which would be problematic, when we use this function.
 
 \subsection{Hyperparameters}\label{hyper}
 Each MCMC algorithm has a set of hyperparameters which must be determined for optimal performance. Here we describe the general procedure for selecting the hyperparameters for each MCMC.
