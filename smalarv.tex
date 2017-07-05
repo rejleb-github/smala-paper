@@ -34,8 +34,10 @@
 %\usepackage{afterpage}
 \usepackage{capt-of}% or use the larger `caption` package
 \usepackage{multirow}
-\usepackage{color}
+\usepackage{xcolor}
+\usepackage{hyperref}
 \def\memohr#1{\color{blue}$HR[${\bf #1}$]$ \color{black}}
+\def\memorl#1{\color{gray}$RL[${\bf #1}$]$ \color{black}}
 
 
 %\usepackage[options]{hyperref}
@@ -74,7 +76,9 @@
        \memohr{A few general notes:\\
            1) AandA charges publication fees. MNRAS does not. For that reason I like MNRAS.\\
            2) Did you choose the abstract with subheadings on purpose? This kind of abstract is not universally appreciated in the community. \\
-           3) In tex files, I find it useful to have one line per sentence. This makes it easy to move sentences around. It also helps git to make reasonable diffs.
+           3) In tex files, I find it useful to have one line per sentence. This makes it easy to move sentences around. It also helps git to make reasonable diffs.\\
+       }
+       \memorl{ RE: 1) I will move this work to an MNRAS template sometime later, this will also change the abstract form.
        }
    }
 
@@ -84,13 +88,26 @@
   \abstract
   % context heading (optional)
   % {} leave it empty if necessary  
-   {In recent years, thousands of exoplanets of been discovered. Given this large amount of data, it is imperative that we optimize our ability to perform analysis. One of the techniques who are used to discover or analyze exoplanets are radial velocities surveys. In order to fit this type data, Markov Chain Monte Carlo (MCMC) methods are often applied.}
+   {In recent years, thousands of exoplanets of been discovered. 
+Given this large amount of data, it is imperative that we optimize our ability to perform analysis. 
+One of the techniques who are used to discover or analyze exoplanets are radial velocities surveys. 
+In order to fit this type data, Markov Chain Monte Carlo (MCMC) methods are often applied.}
   % aims heading (mandatory)
-   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. This algorithm produces less correlated samples but each proposal is more costly. We aim to if this leads to an increased overall efficiency or not.}
+   {In this work, we determine the effectiveness of langevin MCMC methods on radial velocity fitting. 
+This algorithm produces less correlated samples but each proposal is more costly. 
+We aim investigate to if this leads to an increased overall efficiency or not.}
   % methods heading (mandatory)
-   {The performance we obtain is compared with the performance of another standard MCMC, the affine invariant sampler. \memohr{What does this have to do with methods? It also contradicts the results below.}}
+   {The performance we obtain is compared with the performance of two other standard MCMC, the affine invariant sampler and HMC.
+We do this using time normalized effective sample size as our measure for a few test problems. 
+\memohr{What does this have to do with methods? It also contradicts the results below.}
+\memorl{I now clarify that the method we use to see if SMALA is better or worse is by comparing the MCMC with time normalized ESS as our measure.}
+}
   % results heading (mandatory)
-   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large. This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler \memohr{Isn't this the same as the last sentence?}.}
+   {We observe that the computational costs associated with the second derivatives is too high when the dimensionality of the problem becomes large.
+This costs outweighs some of the benefits from uncorrelated steps. Additionally, in high dimensional cases we see that our implemented langevin method tends toward similar autocorrelation times to the affine invariant sampler.
+\memohr{Isn't this the same as the last sentence?}
+\memorl{There's a subtle difference which is discussed at length in the later parts. Not only does the computational cost go up, the effective sample size/autocorrelation time is practically the same in addition to that. In the discussion I propose some reasoning why the autocorrelation times aren't better than emcee at this higher dim...this is the discussion we had about collisions/etc}.
+}
   % conclusions heading (optional), leave it empty if necessary 
    {}
 
@@ -104,23 +121,44 @@
 %________________________________________________________________
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
-With thousands of exoplanets having already been discovered \cite{exoArchive}, many methods are used or combined to either refine our information or make yet newer discoveries. The two biggest contributors are transit measurements and radial velocity surveys. It may not always be possible to invest into more computing power to process this data. In order to process this large volume of data we need to use efficient Markov Chain Monte Carlo (MCMC) techniques. One route to speed up convergence of posteriors is to have an MCMC which makes better proposals. The idea is that by making these better proposals, we obtain uncorrelated samples, and thus require a smaller sample size to achieve the same effective sample size (ESS).
+With thousands of exoplanets having already been discovered \cite{exoArchive}, many methods are used or combined to either refine our information or make yet newer discoveries. 
+The two biggest contributors are transit measurements and radial velocity surveys. 
+It may not always be possible to invest into more computing power to process this data. 
+In order to process this large volume of data we need to use efficient Markov Chain Monte Carlo (MCMC) techniques. 
+One route to speed up convergence of posteriors is to have an MCMC which makes better proposals. 
+The idea is that by making these better proposals, we obtain uncorrelated samples, and thus require a smaller sample size to achieve the same effective sample size (ESS).
 
-This is what Langevin MCMC methods do by using derivative information of the likelihood space. These types of techniques have never been implemented in an exoplanet context, and pose various technical challenges. These are discussed at length in section \ref{setup}. To test Langevin methods we require the derivative information, thus we need an analytical coordinate system described by \cite{Pl2009} such that these values are always defined. This calculation needs to be as efficient as possible, so we use an implementation of \texttt{Rebound}'s variational equations from \cite{Rein2016} to compute the $\chi^2$ likelihood derivative. Alongside this, we carefully selected the hyperparameters of the MCMC methods, as explained in section \ref{hyper}.
+This is what Langevin MCMC methods do by using derivative information of the likelihood space. 
+These types of techniques have never been implemented in an exoplanet context, and pose various technical challenges. 
+These are discussed at length in section \ref{setup}. 
+To test Langevin methods we require the derivative information, thus we need an analytical coordinate system described by \cite{Pl2009} such that these values are always defined. 
+This calculation needs to be as efficient as possible, so we use an implementation of \texttt{Rebound}'s variational equations from \cite{Rein2016} to compute the $\chi^2$ likelihood derivative. 
+Alongside this, we carefully selected the hyperparameters of the MCMC methods, as explained in section \ref{hyper}.
 
-In this paper we compare our implementation with another MCMC by using the CPU time-normalized effective sample size (shortened to efficiency). We use 3 sample fitting problems to compare the algorithms, where we initialize the MCMC with best known, or true initial conditions. These have dimensions $N=1$, $N=4$, and $N=10$, ranging from the most simplistic case to using real data from a multi-planet system which is in resonance. These results are presented in section \ref{results}.
+In this paper we compare our implementation with another MCMC by using the CPU time-normalized effective sample size (shortened to efficiency). 
+We use 3 sample fitting problems to compare the algorithms, where we initialize the MCMC with best known, or true initial conditions. 
+These have dimensions $N=1$, $N=4$, and $N=10$, ranging from the most simplistic case to using real data from a multi-planet system which is in resonance. 
+These results are presented in section \ref{results}.
 
 \memohr{This section reads really well!}
  
 \section{Methods and Setup}\label{setup}
 \subsection{MCMC Methods}
-The Langevin method we chose in our implementation is the Simplified manifold Metropolis-Adjusted Langevin Algorithm (SMALA). The SMALA algorithm simplifies the general N-dimensional MALA algorithm by assuming the space is mostly flat and eliminating the terms in the proposal which account for the curvature of the space \citep{Girolami2011}.
+The Langevin method we chose in our implementation is the Simplified manifold Metropolis-Adjusted Langevin Algorithm (SMALA). 
+The SMALA algorithm simplifies the general N-dimensional MALA algorithm by assuming the space is mostly flat and eliminating the terms in the proposal which account for the curvature of the space \citep{Girolami2011}.
 \memohr{I'm not sure this is a correct description of SMALA. Clearly, we take into account the curvature of the likelihood space.}
+\memorl{We look at the curvature of the likelihood function but not the curvature of the space it's in. Technically, likelihood space is an abuse of language... which I am also guilty of! Specifically, Girolami drops the Christoffel symbols which would be required for a generic Riemanian manifold, here we just assume the likelihood function lives in a Cartesian coordinate (uncurved coordinate for the space) so these terms are 0, hence `simplified'.}
 
-With this simplification, the SMALA approach can be explained with a simple example. Given a Gaussian likelihood space, the Metropolis-Hastings algorithm will randomly wander through the distribution, favoring movement towards the maximum likelihood.
-Rather than doing random jumps, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. The SMALA method will use the first and second derivatives of the sampler to project a parabola. By jumping to the maximum of this parabola, we are able to quickly cross much of the likelihood space. 
+With this simplification, the SMALA approach can be explained with a simple example. 
+Given a Gaussian likelihood space, the Metropolis-Hastings algorithm will randomly wander through the distribution, favoring movement towards the maximum likelihood.
+Rather than doing random jumps, we can make more effective proposals if we assume our likelihood function is approximately parabolic near the maximum. 
+The SMALA method will use the first and second derivatives of the sampler to project a parabola. 
+By jumping in close proximity of the maximum of this parabola, we are able to quickly cross much of the likelihood space. 
+The exact position of the jump is randomized to sample the space effectively.
 \memohr{This sounds like we're just doing an interation of Newton's method. Need to mention that SMALA does not really jump to the maximum.}
-This is shown very well in the sample problems of \cite{Girolami2011}. Depending on how good this parabolic approximation is, we can expect two benefits.
+\memorl{Addressed.}
+This is shown very well in the sample problems of \cite{Girolami2011}. 
+Depending on how good this parabolic approximation is, we can expect two benefits.
 \begin{itemize}
 \item Reaching the neighborhood of the maximum likelihood with fewer steps.
 \item Highly uncorrelated samples.
@@ -128,7 +166,13 @@ This is shown very well in the sample problems of \cite{Girolami2011}. Depending
 However, this comes with the computational cost of calculating the gradient and Hessian of the likelihood function, which will scale in $\mathcal{O}(n^2)$.
 \memohr{define $n$}
 
-We will compare the algorithm with the affine invariant sampling MCMC from \cite{Foreman-Mackey2013} \memohr{Note that that FM2013 paper is mainly an implementation of the affine invariant sample. The only thing they add is splitting the sampler into two pools which allows for parallelization among other things. Should cite the original paper here.} and an implementation of Hamiltonian Monte Carlo (abbreviated as HMC) \citep{Duane1987}. While we created our own python implementation of SMALA, the affine invariant MCMC has its own python package implementation known as EMCEE which we have used in our framework. This MCMC uses an ensemble of walkers to make linear proposals based on certain `moves'. In this work we use simple `stretch moves' which are described in full detail by \cite{Foreman-Mackey2013}. The other MCMC we compare with is the HMC which uses Hamiltonian mechanics to create new proposals. For a particular state an arbitrary velocity kick is given, drawn from a standard normal distribution. This will allow generating a new proposal based on how the state or `particle' will travel on the likelihood function as described by Hamiltonian mechanics. We implement a leapfrog method for integrating the state vector forward.
+We will compare the algorithm with the affine invariant sampling MCMC from \cite{Goodman2010} \memohr{Note that that FM2013 paper is mainly an implementation of the affine invariant sample. The only thing they add is splitting the sampler into two pools which allows for parallelization among other things. Should cite the original paper here.} \memorl{Good point, addressed.} and an implementation of Hamiltonian Monte Carlo (abbreviated as HMC) \citep{Duane1987}.
+While we created our own python implementation of SMALA, the affine invariant MCMC has its own python package implementation known as EMCEE which we have used in our framework. 
+This MCMC uses an ensemble of walkers to make linear proposals based on certain `moves'. 
+In this work we use simple `stretch moves' which are described in full detail by \cite{Foreman-Mackey2013}. 
+The other MCMC we compare with is the HMC which uses Hamiltonian mechanics to create new proposals. 
+For a particular state an arbitrary velocity kick is given, drawn from a standard normal distribution. 
+This will allow generating a new proposal based on how the state or `particle' will travel on the likelihood function as described by Hamiltonian mechanics. We implement a leapfrog method for integrating the state vector forward.
 
 \subsection{Measures to Ensure Stability and Correctness}
 Various steps were taken to maximize the numerical stability and usability of the MCMC for fitting exoplanets. Some were directly implemented into \texttt{Rebound}, while others were implemented at a higher level within our framework.
@@ -136,67 +180,148 @@ Various steps were taken to maximize the numerical stability and usability of th
 \subsubsection{\texttt{Rebound} Side}\label{analytical}
 In the framework of traditional orbital elements certain derivatives be undefined. For example, the derivative of the argument of periapsis, $\omega$, is undefined when the eccentricity is zero. To remedy this issue we use analytical coordinates. The coordinates by \cite{Pl2009} are trivially analytical since they use trigonometric functions, and are thus infinitely differentiable. In his paper, we find transformations which maps the traditional orbital elements unto an alternative set, $a, e, i, \omega, \Omega, M \to a, h, k, i_x, i_y, \lambda$ where $h$ and $k$ are the Lagrangian orbital elements, and the inclination and longitude are decomposed into $i_x$, $i_y$, and $\lambda$ gives the mean longitude. The equations describing this transformation  can be found in the original paper. 
 \memohr{This is basically just the chain rule. I don't think this deserves a discussion here.}
+\memorl{I just list the variables of the coordinate change since I think that's very basic info that's convenient for the reader. It provides some idea of the coordinate without going in detail. Naturally if the reader cares about the details of the chain rule they can just check Pal's paper...}
 
 These coordinates come with a caveat, as there are some derivatives undefined when there are more than two planets. This is a special case, when two planets are exactly retrograde. Since this special case is a rather unnatural configuration, it poses no issues in practicality.
 \memohr{I don't understand this paragraph}
+\memorl{This is the one case where we get undefined derivatives... two perfectly retrograde orbits. We definitely talked about this when we implemented it and quickly said that it was no problem in any real system. If memory serves my right, this would be the second derivatives with one inclination of each planet ($\partial i_{x1} \partial i_{x2}$), though I could be misremembering.}
 
-We combine these coordinates with the variational equations of \texttt{Rebound} to calculate the likelihood gradient and Hessian. These allow us to integrate the derivatives along with the dynamical system with very high numerical accuracy. These variational equations are initialized such to provide the response of the system with respect to the velocity component of the primary object. For example, a first order variation we could get would be $\frac{dv_x}{dh}$, and for a second order we could obtain $\frac{d^2v_x}{dhda}$. Given every one of these combinations we can build the $\chi^2$ Hessian with respect to the radial velocity measurements.
+We combine these coordinates with the variational equations of \texttt{Rebound} to calculate the likelihood gradient and Hessian. 
+These allow us to integrate the derivatives along with the dynamical system with very high numerical accuracy. 
+These variational equations are initialized such to provide the response of the system with respect to the velocity component of the primary object. 
+For example, a first order variation we could get would be $\frac{dv_x}{dh}$, and for a second order we could obtain $\frac{d^2v_x}{dhda}$. 
+Given every one of these combinations we can build the $\chi^2$ Hessian with respect to the radial velocity measurements.
 
-In order to handle close encounters and collisions we define a minimum distance in terms of Hill radii of the largest planet, shortened to largest hill radii. For our implementation in \texttt{Rebound}, if any exoplanets are within 2 times the largest hill radii of each other, the simulation will exit and return a likelihood of $0$ for this particular system. 
-
-We assume that any planetary system which is observed today must necessarily be long-term stable such that it formed. Unfortunately it is not computationally feasible to test the long-term stability of every sample, so we settle for the short-term stability measure described above.
+For our implementation in \texttt{Rebound}, if two planets come within two Hill radii of each other, the system is considered unstable and a likelihood of 0 is returned. 
+We assign a likelihood of 0 since we assume that any planetary system which is observed today must necessarily be long-term stable. 
+Unfortunately it is not computationally feasible to test the long-term stability of every sample, so we settle for this criteria even if the close encounter would not fully destabilize the system.
 \memohr{I think the last to parasgrpahs can be summarized as follows: "If two planets come within two Hill radii of each other, the system is considered unstable and a likelihood of 0 is returned.}
+\memorl{Shortened.}
 
 \subsubsection{Python Side}
-In the python front end we use a few tricks to improve the numerical stability. To handle very low likelihoods without numerical errors growing large, we work in log-likelihood. In addition to this, we avoid correlation bias between the semi-major axis and the mean longitude by making our integrations two-sided, centered on time $t=0$ \memohr{I don't think this is clear. Maybe reference Eric's paper where he used this}. This correlation stems from the fact that a small change in period can allow `wiggle room' for a small change in phase, unless we allow this small perturbation to affect the data symmetrically.
+In the python front end we use a few tricks to improve the numerical stability. 
+To handle very low likelihoods without numerical errors growing large, we work in log-likelihood. 
+In addition to this, we avoid correlation bias between the semi-major axis and the mean longitude by making our integrations two-sided, centered on time $t=0$ \memohr{I don't think this is clear. Maybe reference Eric's paper where he used this}.
+This correlation stems from the fact that a small change in period can allow `wiggle room' for a small change in phase, unless we allow this small perturbation to affect the data symmetrically.
+Full details on this can be found in [...].
+\memorl{Can't seem to locate the paper in which he employs this method..., I've checked the ones which mentioned RV in the title.. \href{http://astro.psu.edu/people/ebf11}{link to his homepage which has a link to his publications}}
 
-In order to avoid instability during the inversion of the Hessian we take the soft absolute value of the eigenvalues. This function, called softabs, is described in \cite{softabs}. \memohr{The 'soft absolute value of the eigenvalues' is not very clear. Try to be more precise.} This function gives the same behavior as an absolute value operator except near $0$ where it is smoothed out according to a scaling variable $\alpha$.An eigenvalue of $0$ assume a value of $1/\alpha$ instead of $0$, which would be problematic, when we use this function.
+In order to avoid instability during the inversion of the Hessian we take use a type of absolute value function on the eigenvalues. 
+This forces the eigenvalues to be non-negative and above a certain threshold which is determined by a hyperparameter.
+This function, called softabs, is described in \cite{softabs}.
+\memohr{The 'soft absolute value of the eigenvalues' is not very clear. Try to be more precise.} 
+\memorl{Addressed.}
+This function gives the same behavior as an absolute value operator except near $0$ where it is smoothed out according to a scaling variable $\alpha$.
+An eigenvalue of $0$ assume a value of $1/\alpha$ instead of $0$, which would be problematic, when we use this function.
 
 \subsection{Hyperparameters}\label{hyper}
 Each MCMC algorithm has a set of hyperparameters which must be determined for optimal performance. Here we describe the general procedure for selecting the hyperparameters for each MCMC.
 
-One of the greatest assets of the affine invariant MCMC is the lack of hyperparameters that need to be set by the user and the ease of selection. Only two major hyperparameters need to be chosen, these are the number of walkers in the ensemble and the `aggressiveness of the stretch moves' (denoted as $a$ in the emcee documentation). The performance of emcee increases with more walkers, for our test problems we have found 32 walkers to be sufficient as adding more did not give significant gains in performance. The $a$ parameter was left at the recommended default value (a=2), we refer the reader to \cite{Foreman-Mackey2013} for a more detailed explanation on the significance of the parameter. Another factor to consider is how the walkers are initialized. In general, initializing the ensemble as a small Gaussian sphere works remarkably well in almost every scenario. However, this approach may require a significant burn-in phase as the walkers expand to occupy the local shape of the likelihood space.
+One of the greatest assets of the affine invariant MCMC is the lack of hyperparameters that need to be set by the user and the ease of selection. 
+Only two major hyperparameters need to be chosen, these are the number of walkers in the ensemble and the `aggressiveness of the stretch moves' (denoted as $a$ in the emcee documentation). 
+The performance of emcee increases with more walkers, for our test problems we have found 32 walkers to be sufficient as adding more did not give significant gains in performance. 
+The $a$ parameter was left at the recommended default value (a=2), we refer the reader to \cite{Foreman-Mackey2013} for a more detailed explanation on the significance of the parameter. 
+Another factor to consider is how the walkers are initialized. In general, initializing the ensemble as a small Gaussian sphere works remarkably well in almost every scenario. 
+However, this approach may require a significant burn-in phase as the walkers expand to occupy the local shape of the likelihood space.
 
-For SMALA we need to specify a step scale $\epsilon$ and the softabs' $\alpha$ hyperparameter. The $\epsilon$ sets the `aggressiveness' of proposals and is used to fine-tune the acceptance rate. Geometrically, this corresponds to how far up the N-dimensional parabola we let the added `randomness' go. According to \cite{robert1998} the optimal acceptance rate tends towards $57\%$ as the dimensionality goes to infinity, thus we fix $\epsilon$ to give an acceptance rate in this neighborhood. The intuition for the $\alpha$ parameter is that it gives and maximum width to the proposal parabola. In the limiting case where this parameter is miscalculated and inhibits the MCMC's ability to make proposals, SMALA will behave like a Metropolis-Hastings MCMC. This is shown in Figure \ref{alpha}. While if we let $\alpha$ be too large, this may lead to numerical instabilities. In the context of exoplanets, both of the aforementioned parameters should approximately be of order unity.
+For SMALA we need to specify a step scale $\epsilon$ and the softabs' $\alpha$ hyperparameter. 
+The $\epsilon$ sets the `aggressiveness' of proposals and is used to fine-tune the acceptance rate. 
+Geometrically, this corresponds to how far up the N-dimensional parabola we let the added `randomness' go. 
+According to \cite{robert1998} the optimal acceptance rate tends towards $57\%$ as the dimensionality goes to infinity, thus we fix $\epsilon$ to give an acceptance rate in this neighborhood. 
+The intuition for the $\alpha$ parameter is that it gives and maximum width to the proposal parabola. 
+In the limiting case where this parameter is miscalculated and inhibits the MCMC's ability to make proposals, SMALA will behave like a Metropolis-Hastings MCMC. 
+This is shown in Figure \ref{alpha}. 
+While if we let $\alpha$ be too large, this may lead to numerical instabilities. 
+In the context of exoplanets, both of the aforementioned parameters should approximately be of order unity.
 
 \begin{figure}
 \centering
 \includegraphics[width=0.95\hsize]{alpha-1.png}
-   \caption{This figure shows the effect of the alpha hyper-parameter on SMALA's sampling by considering 3 cases with increasing errors. Increasing the error on the data affects the sensitivity of the derivatives. This system contains one planet with only mass as a parameter, hence in this simple problem we expect the likelihood space to follow the parabolic approximation very closely. This is seen in cases one and two of this example. In case 3 where the error is greatest, the $\alpha$ parameter takes effect and limits the proposals. All three parabolas are generated from the Hessian at the true mass of the system.}
+   \caption{This figure shows the effect of the alpha hyper-parameter on SMALA's sampling by considering 3 cases with increasing errors. 
+Increasing the error on the data affects the sensitivity of the derivatives. 
+This system contains one planet with only mass as a parameter, hence in this simple problem we expect the likelihood space to follow the parabolic approximation very closely. 
+This is seen in cases one and two of this example. 
+In case 3 where the error is greatest, the $\alpha$ parameter takes effect and limits the proposals. 
+All three parabolas are generated from the Hessian at the true mass of the system.}
       \label{alpha}
 \end{figure}
 
-When using HMC we have three major hyperparameters to select. We must pick out a $\delta$ for the leapfrog steps, the number of leapfrog steps $L$ before testing a proposal state, and we need an appropriate mass matrix $M$ which corresponds the the scales and correlation of the parameters. A complete description can be found in chapter 5 of the MCMC Handbook \cite{1206.1901}. Due to the cost of evaluating the likelihood and its derivatives, $L=1$ gives the best efficiency score even when $N=1$. The $\delta$ parameter is degenerate in the sense that changing it corresponds to the same effect as multiplying the mass matrix by some coefficient. Hence, we chose a $\delta$ of order unity. For the selection of the matrix $M$ we use have opted to only specify the diagonal as doing all $N^2$ elements would be very time consuming. The optimal acceptance rate for the HMC algorithm is determined by \cite{1001.4460}. In the limiting case of $L=1$ we obtain best results near an acceptance rate of $57\%$, in contrast with the optimal results for $L>1$ which are a few percent higher at $65\%$. In addition to having an appropriate acceptance rate, we require the diagonal of $M$ to give autocorrelation rates which are approximately equal. A good initial guess of the diagonal can be given by the inverse of the parameters. These masses are then tweaked according to the guidelines above.
+When using HMC we have three major hyperparameters to select. 
+We must pick out a $\delta$ for the leapfrog steps, the number of leapfrog steps $L$ before testing a proposal state, and we need an appropriate mass matrix $M$ which corresponds the the scales and correlation of the parameters. 
+A complete description can be found in chapter 5 of the MCMC Handbook \cite{1206.1901}. 
+Due to the cost of evaluating the likelihood and its derivatives, $L=1$ gives the best efficiency score even when $N=1$. 
+The $\delta$ parameter is degenerate in the sense that changing it corresponds to the same effect as multiplying the mass matrix by some coefficient.
+Hence, we chose a $\delta$ of order unity. 
+For the selection of the matrix $M$ we use have opted to only specify the diagonal as doing all $N^2$ elements would be very time consuming.
+The optimal acceptance rate for the HMC algorithm is determined by \cite{1001.4460}. 
+In the limiting case of $L=1$ we obtain best results near an acceptance rate of $57\%$, in contrast with the optimal results for $L>1$ which are a few percent higher at $65\%$. 
+In addition to having an appropriate acceptance rate, we require the diagonal of $M$ to give autocorrelation rates which are approximately equal.
+A good initial guess of the diagonal can be given by the inverse of the parameters. 
+These masses are then tweaked according to the guidelines above.
 
-Consider an example of $N=4$. Given the above procedure guidelines, say we would obtain an acceptance rate of $57\%$ with autocorrelations $AC_N = 12, 5, 2, 50$ with a first guess. This would not constitute an appropriate MCMC run as one of the parameters will be greatly under determined due to inefficient sampling in that dimension. In contrast, if we would change the mass hyperparameters to give an acceptance rate of $54\%$ with $AC_N = 6, 7, 5, 8$, this would result in an appropriate instance of the MCMC with greater efficiency than the former. Namely, the efficiency is limited by the longest autocorrelation time (which gives the smallest effective sample size). Unfortunately, a certain amount of trial and error, and thus human labor, is required in order to find appropriate hyperparameters. One of the advantages of EMCEE and SMALA over HMC is the ease of selecting these hyperparameters.
+Consider an example of $N=4$. 
+Given the above procedure guidelines, say we would obtain an acceptance rate of $57\%$ with autocorrelations $AC_N = 12, 5, 2, 50$ with a first guess.
+This would not constitute an appropriate MCMC run as one of the parameters will be greatly under determined due to inefficient sampling in that dimension. 
+In contrast, if we would change the mass hyperparameters to give an acceptance rate of $54\%$ with $AC_N = 6, 7, 5, 8$, this would result in an appropriate instance of the MCMC with greater efficiency than the former. 
+Namely, the efficiency is limited by the longest autocorrelation time (which gives the smallest effective sample size). 
+Unfortunately, a certain amount of trial and error, and thus human labor, is required in order to find appropriate hyperparameters. 
+One of the advantages of EMCEE and SMALA over HMC is the ease of selecting these hyperparameters.
 
-Next we consider a short analysis of the local sensitivity of the hyperparameters for HMC and SMALA. This provides a rough idea to what order of magnitude the hyperparameters must be selected in practice. To quantify this we use a Monte Carlo approach and do 128 MCMC runs of an $N=4$ system of two planets (see Section \ref{n4section}) for both MCMC. With each run a chosen hyperparameter is randomized. The measure of efficiency is explained in Section \ref{results}, however the most noteworthy point is that this score is a function of random variables. This measure will converge in the limit of infinite MCMC steps. For this Monte Carlo data, each run will have approximately 1000 autocorrelation times (as measured from near optimal performance) or alternatively, a few hundred effective samples. This corresponds to approximately 10000 steps for each SMALA run and 25000 steps for each HMC score evaluation. 
+Next we consider a short analysis of the local sensitivity of the hyperparameters for HMC and SMALA. 
+This provides a rough idea to what order of magnitude the hyperparameters must be selected in practice. 
+To quantify this we use a Monte Carlo approach and do 128 MCMC runs of an $N=4$ system of two planets (see Section \ref{n4section}) for both MCMC.
+With each run a chosen hyperparameter is randomized. The measure of efficiency is explained in Section \ref{results}, however the most noteworthy point is that this score is a function of random variables. 
+This measure will converge in the limit of infinite MCMC steps. 
+For this Monte Carlo data, each run will have approximately 1000 autocorrelation times (as measured from near optimal performance) or alternatively, a few hundred effective samples. 
+This corresponds to approximately 10000 steps for each SMALA run and 25000 steps for each HMC score evaluation. 
 
-In Figure \ref{sensfig} can see the efficiency score as a function of hyperparameter value. In the upper portion of the plot we see SMALA, while the lower subplot shows the HMC performances. For SMALA we see performance smoothly decreasing as the hyperparameters receives larger perturbations from the optimal. However, we note that there are a few points new optimal $\epsilon$ which give low scores. These correspond to MCMC runs where the algorithm becomes entrapped in a part of phase space. These are rare occurrences when the MCMC fails to make good proposals for many steps in a row. For the HMC runs we observe that the hyperparameter is less smooth and appears to mimic a stepwise function on the left of the plot. This qualitatively shows that we may obtain non-trivial behavior when trying to optimize the HMC hyperparameters. As such, it can be somewhat challenging for a human to find the best mass hyperparameters for HMC in high dimensional cases given increasing sensitivity. This is expected as the likelihood space becomes more complex.
+In Figure \ref{sensfig} can see the efficiency score as a function of hyperparameter value. 
+In the upper portion of the plot we see SMALA, while the lower subplot shows the HMC performances. For SMALA we see performance smoothly decreasing as the hyperparameters receives larger perturbations from the optimal. 
+However, we note that there are a few points new optimal $\epsilon$ which give low scores. 
+These correspond to MCMC runs where the algorithm becomes entrapped in a part of phase space. 
+These are rare occurrences when the MCMC fails to make good proposals for many steps in a row. 
+For the HMC runs we observe that the hyperparameter is less smooth and appears to mimic a stepwise function on the left of the plot. 
+This qualitatively shows that we may obtain non-trivial behavior when trying to optimize the HMC hyperparameters. 
+As such, it can be somewhat challenging for a human to find the best mass hyperparameters for HMC in high dimensional cases given increasing sensitivity. 
+This is expected as the likelihood space becomes more complex.
 
 \begin{figure}
 \centering
 \includegraphics[width=0.95\hsize]{sensitivity-1.png}
-   \caption{This figure shows the hyperparameter sensitivity of SMALA and HMC for a 4 dimensional parameter space. We observe a few rare events where SMALA fails to perform optimally and see the HMC score exhibit non-trivial behavior in the left portion of the lower plot. The width of the bands give an estimation of the error for a few hundred effective samples.}
+   \caption{This figure shows the hyperparameter sensitivity of SMALA and HMC for a 4 dimensional parameter space. 
+We observe a few rare events where SMALA fails to perform optimally and see the HMC score exhibit non-trivial behavior in the left portion of the lower plot. 
+The width of the bands give an estimation of the error for a few hundred effective samples.}
       \label{sensfig}
 \end{figure}
 
 \section{Results}\label{results}
 \subsection{Simple Test, $N=1$}
-We use this simple test case to verify the algorithms and introduce the time-normalized ESS which is used to compare the effectiveness of the MCMC. This method is used in other comparative works such as \cite{Girolami2011, 1504.01418, Meyer2016, Lan2015} and many others. The total ESS if limited by the parameter which has the greatest autocorrelation time. Picking the smallest ESS among the $N$ parameters, we obtain $$ESS = \min_N\bigg( \frac{N}{(1+2\sum AC_k)}\bigg)$$ which is then normalized by the total CPU time in seconds. 
+We use this simple test case to verify the algorithms and introduce the time-normalized ESS which is used to compare the effectiveness of the MCMC.
+This method is used in other comparative works such as \cite{Girolami2011, 1504.01418, Meyer2016, Lan2015} and many others. 
+The total ESS if limited by the parameter which has the greatest autocorrelation time. Picking the smallest ESS among the $N$ parameters, we obtain $$ESS = \min_N\bigg( \frac{N}{(1+2\sum AC_k)}\bigg)$$ which is then normalized by the total CPU time in seconds. 
 
-For this $N=1$ case we consider a planet with semi-major axis of $0.320$ and about $2.05$ Jupiter masses observed for a few orbits. The generated data has errors of $10$ \si{\metre\per\second} with a small variance and was integrated for three and a half orbits. The fitting parameter selected is the semi-major axis.
+For this $N=1$ case we consider a planet with semi-major axis of $0.320$ and about $2.05$ Jupiter masses observed for a few orbits.
+The generated data has errors of $10$ \si{\metre\per\second} with a small variance and was integrated for three and a half orbits.
+The fitting parameter selected is the semi-major axis.
 
-The initial conditions of the MCMC are the same as the true conditions. The resulting radial velocity curve is shown in Figure \ref{FigSimple}. In the upper part of the figure we see the initial conditions overlapped with traces of accepted proposals. Below we find the curve generated from taking the average of the resulting posterior samples, along with residuals.
+The initial conditions of the MCMC are the same as the true conditions. 
+The resulting radial velocity curve is shown in Figure \ref{FigSimple}. 
+In the upper part of the figure we see the initial conditions overlapped with traces of accepted proposals. 
+Below we find the curve generated from taking the average of the resulting posterior samples, along with residuals.
 
 \begin{figure}
 \centering
 \includegraphics[width=0.95\hsize]{rv1-1.png}
-   \caption{This figure shows the results for the simple test case with SMALA. In the top panel we find the RV curve of the initial conditions in purple and 50 random trails generated from samples in the posterior. This shows the spread in how well the samples fit the curve. The middle and bottom subplot shows the average result after the burn in phase and the residuals of that fit, we can see that the initial conditions are well recovered.}
+   \caption{This figure shows the results for the simple test case with SMALA. 
+In the top panel we find the RV curve of the initial conditions in purple and 50 random trails generated from samples in the posterior. 
+This shows the spread in how well the samples fit the curve. 
+The middle and bottom subplot shows the average result after the burn in phase and the residuals of that fit, we can see that the initial conditions are well recovered.}
       \label{FigSimple}
 \end{figure}
 
-In this simple case 1-D case the SMALA algorithm strongly outperforms EMCEE and moderately outperforms HMC. This is clearly shown in the first row of Table \ref{Table1}. This is due to the low cost of calculating the first and second derivatives in this sample 1-D problem. The highly uncorrelated samples lead to a large ESS, this combined with the above makes the SMALA MCMC very efficient in the one dimension case, also surpassing HMC. All algorithms perfectly recover the original conditions and give identical distributions.
+In this simple case 1-D case the SMALA algorithm strongly outperforms EMCEE and moderately outperforms HMC. 
+This is clearly shown in the first row of Table \ref{Table1}. This is due to the low cost of calculating the first and second derivatives in this sample 1-D problem. 
+The highly uncorrelated samples lead to a large ESS, this combined with the above makes the SMALA MCMC very efficient in the one dimension case, also surpassing HMC. All algorithms perfectly recover the original conditions and give identical distributions.
 
 \begin{table}
 \caption{MCMC Efficiency Results}             % title of Table
@@ -225,33 +350,67 @@ In this simple case 1-D case the SMALA algorithm strongly outperforms EMCEE and 
 
 \subsection{2-Planet Case, $N=4$}\label{n4section}
 
-In this problem we try fitting four parameters from two planets, we consider the semi-major axis and phase of each planet. As with the previous example, we start from the true parameters and run both MCMC for a few hundred thousand steps. The synthetic observations have 250 data points with errors centered on $10$ \si{\metre\per\second}. The data spans points are spread out over about a dozen orbits.
+In this problem we try fitting four parameters from two planets, we consider the semi-major axis and phase of each planet. 
+As with the previous example, we start from the true parameters and run both MCMC for a few hundred thousand steps. 
+The synthetic observations have 250 data points with errors centered on $10$ \si{\metre\per\second}. 
+The data spans points are spread out over about a dozen orbits.
 
-The resulting time normalized ESS are $0.558$, $0.360$, and $0.341$ for EMCEE, HMC, and SMALA respectively, as noted in Table \ref{Table1}. For four parameters, the SMALA algorithm will require a much longer runtime than EMCEE but will still generate posterior samples which are uncorrelated enough to compensate. The HMC algorithm shows the same behavior but with less intensity. For this case, the results of the algorithms quite similar and show approximately the same efficiency.
+The resulting time normalized ESS are $0.558$, $0.360$, and $0.341$ for EMCEE, HMC, and SMALA respectively, as noted in Table \ref{Table1}. 
+For four parameters, the SMALA algorithm will require a much longer runtime than EMCEE but will still generate posterior samples which are uncorrelated enough to compensate. 
+The HMC algorithm shows the same behavior but with less intensity. For this case, the results of the algorithms quite similar and show approximately the same efficiency.
 
 
 \subsection{Real Data: HD155358, $N=10$}
 
-Now we consider a real data example using the RV data available for HD155358 from \cite{Robertson2012}. In this fit we solve for for ten parameters, for each planet we obtain: $a$, $m\, \sin i$\footnote{Since the $i_x$, $i_y$ parameters are excluded, we are effectively fitting the degenerate mass.}, $h$, $k$ and $\lambda$ as described in Section \ref{analytical}. The parameters obtained fall within errors of the original work by \cite{Robertson2012}.
+Now we consider a real data example using the RV data available for HD155358 from \cite{Robertson2012}. 
+In this fit we solve for for ten parameters, for each planet we obtain: $a$, $m\, \sin i$\footnote{Since the $i_x$, $i_y$ parameters are excluded, we are effectively fitting the degenerate mass.}, $h$, $k$ and $\lambda$ as described in Section \ref{analytical}. 
+The parameters obtained fall within errors of the original work by \cite{Robertson2012}.
 
-In this scenario the EMCEE algorithm performs much better than SMALA and HMC, having a much higher efficiency by orders of magnitude. This is shown in the last row of Table \ref{Table1} with EMCEE giving $0.03372$ effective samples per second compared to HMC's $0.00272$ and SMALA's $0.00022$.
+In this scenario the EMCEE algorithm performs much better than SMALA and HMC, having a much higher efficiency by orders of magnitude. 
+This is shown in the last row of Table \ref{Table1} with EMCEE giving $0.03372$ effective samples per second compared to HMC's $0.00272$ and SMALA's $0.00022$.
 
 \begin{figure}
 \centering
 \includegraphics[width=0.95\hsize]{rv3-1.png}
-   \caption{This figure shows the results for the HD155358 system. The uppermost plot shows the initial conditions of the system and the spread in the radial velocity curves generated from the posterior. The initial conditions used were provided by Robertson \cite{Robertson2012}. The radial velocity curve of the average parameters and residuals are presented below. The resulting parameters can be found in the appendix.}
+   \caption{This figure shows the results for the HD155358 system. 
+The uppermost plot shows the initial conditions of the system and the spread in the radial velocity curves generated from the posterior. 
+The initial conditions used were provided by Robertson \cite{Robertson2012}. 
+The radial velocity curve of the average parameters and residuals are presented below. 
+The resulting parameters can be found in the appendix.}
       \label{FigHD}
 \end{figure}
 
 \section{Discussion \& Conclusion}
-In general, when dealing with a full multi-planet system the SMALA algorithm does not perform well. Even in the smallest possible real case of $N=7$ parameters (mass \& 6 orbital parameters) SMALA will be outperformed by EMCEE \& HMC. The computational cost of calculating the metric is no longer beneficial at this dimensionality. When comparing the effective sample sizes, SMALA only produced less correlated samples in the cases of $N \leq 4$ parameters, while emcee performs better for the $N>4$ cases. We suspect that in addition to the computational cost, the complexity and nonlinearity of the high dimensional likelihood space limits the effectiveness of the MCMC, as it becomes very challenging to produce highly uncorrelated samples at a reasonable cost. To support this claim on nonlinearity, when we consider a system with two planets that strongly interact, we can observe these effects. This appears in some of the posterior samples, as shown by the trails in Figure \ref{FigHD}, we see these strong nonlinear effects on the left side as some RV trails extend above the $0.002$ mark. When the likelihood space exhibits such behavior, we might not expect the parabolic approximation to perform so well. As we get many samples in the phase space neighborhood of collisions, the likelihood manifold becomes curved and distorted. This effect may create a minimum autocorrelation threshold which is reached by the SMALA MCMC. One possible solution to this dilemma would be to acquire data with smaller errors, this geometrically corresponds to tightening the likelihood well, as shown in Figure \ref{alpha}.  This would make the space near the maximum adhere more closely to a parabolic approximation, and prevent the MCMC from wandering in the regions of phase space where collisions and nonlinear effects are likely. However, even with advances in RV instrumentation, it unlikely feasible to obtain errors small enough to resolve these issues via sharper, more `parabola-shaped' likelihoods. Even if we do obtain such small errors, the computational cost will most likely dominate and EMCEE will be the most efficient MCMC.
+In general, when dealing with a full multi-planet system the SMALA algorithm does not perform well. 
+Even in the smallest possible real case of $N=7$ parameters (mass \& 6 orbital parameters) SMALA will be outperformed by EMCEE \& HMC. 
+The computational cost of calculating the metric is no longer beneficial at this dimensionality. 
+When comparing the effective sample sizes, SMALA only produced less correlated samples in the cases of $N \leq 4$ parameters, while emcee performs better for the $N>4$ cases. 
+We suspect that in addition to the computational cost, the complexity and nonlinearity of the high dimensional likelihood space limits the effectiveness of the MCMC, as it becomes very challenging to produce highly uncorrelated samples at a reasonable cost. 
+To support this claim on nonlinearity, when we consider a system with two planets that strongly interact, we can observe these effects. 
+This appears in some of the posterior samples, as shown by the trails in Figure \ref{FigHD}, we see these strong nonlinear effects on the left side as some RV trails extend above the $0.002$ mark. 
+When the likelihood space exhibits such behavior, we might not expect the parabolic approximation to perform so well. 
+As we get many samples in the phase space neighborhood of collisions, the likelihood manifold becomes curved and distorted. 
+This effect may create a minimum autocorrelation threshold which is reached by the SMALA MCMC. 
+One possible solution to this dilemma would be to acquire data with smaller errors, this geometrically corresponds to tightening the likelihood well, as shown in Figure \ref{alpha}.  
+This would make the space near the maximum adhere more closely to a parabolic approximation, and prevent the MCMC from wandering in the regions of phase space where collisions and nonlinear effects are likely. 
+However, even with advances in RV instrumentation, it unlikely feasible to obtain errors small enough to resolve these issues via sharper, more `parabola-shaped' likelihoods. 
+Even if we do obtain such small errors, the computational cost will most likely dominate and EMCEE will be the most efficient MCMC.
 
-To summarize, the costs of generating an accurate Hessians outweighs the benefits of highly uncorrelated steps at high dimensionality. The EMCEE algorithm will outperform SMALA by orders of magnitude in large multi-planet systems encountered in practice. The dimensionality threshold where the affine invariant MCMC and the SMALA MCMC perform comparably is around $N = 4$, meaning that even for a single planet system EMCEE or HMC will be more efficient.
+To summarize, the costs of generating an accurate Hessians outweighs the benefits of highly uncorrelated steps at high dimensionality. 
+The EMCEE algorithm will outperform SMALA by orders of magnitude in large multi-planet systems encountered in practice. 
+The dimensionality threshold where the affine invariant MCMC and the SMALA MCMC perform comparably is around $N = 4$, meaning that even for a single planet system EMCEE or HMC will be more efficient.
 
-In future works we will consider hybrid MCMC which use combinations of  EMCEE, HMC, and SMALA steps to achieve maximal efficiency by giving each MCMC specific combinations parameter. Another example for potential improvements would be to consider Gibbs-SMALA or maybe planet-wise blocked Gibbs sampler approach which could speed up the algorithm. An additional pursuit to improve the speed of analysis might be to use the analytical solution to Kepler's equations in our proposals instead of variational equations, this would be much more computationally cheap. A consequence of this approach would be the introduction of errors in the derivative, as N-body effects would not be considered. Another modification to consider would be the ALSMALA algorithm which uses partial metric updates \cite{1608.07986}. Using an inaccurate metric will lead to more correlated samples, however there may exist an optimum point where overall performance is enhanced.
+In future works we will consider hybrid MCMC which use combinations of  EMCEE, HMC, and SMALA steps to achieve maximal efficiency by giving each MCMC specific combinations parameter. 
+Another example for potential improvements would be to consider Gibbs-SMALA or maybe planet-wise blocked Gibbs sampler approach which could speed up the algorithm. 
+An additional pursuit to improve the speed of analysis might be to use the analytical solution to Kepler's equations in our proposals instead of variational equations, this would be much more computationally cheap. 
+A consequence of this approach would be the introduction of errors in the derivative, as N-body effects would not be considered. 
+Another modification to consider would be the ALSMALA algorithm which uses partial metric updates \cite{1608.07986}. 
+Using an inaccurate metric will lead to more correlated samples, however there may exist an optimum point where overall performance is enhanced.
 
 \begin{acknowledgements}
-	This research was funded by NSERC Discovery Grant RGPIN-2014-04553. Computations were performed on the GPC supercomputer at the SciNet HPC Consortium. SciNet is funded by: the Canada Foundation for Innovation under the auspices of Compute Canada; the Government of Ontario; Ontario Research Fund - Research Excellence; and the University of Toronto.
+	This research was funded by NSERC Discovery Grant RGPIN-2014-04553. 
+Computations were performed on the GPC supercomputer at the SciNet HPC Consortium. 
+SciNet is funded by: the Canada Foundation for Innovation under the auspices of Compute Canada; the Government of Ontario; Ontario Research Fund - Research Excellence; and the University of Toronto.
 \end{acknowledgements}
 
 
