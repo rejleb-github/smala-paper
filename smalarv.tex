@@ -228,11 +228,18 @@ An eigenvalue of $0$ assume a value of $1/\alpha$ instead of $0$, which would be
 Each MCMC algorithm has a set of hyperparameters which must be determined \memodt{tuned} for optimal performance. Here we describe the general procedure for selecting the hyperparameters for each MCMC.
 
 One of the greatest assets of the affine invariant MCMC is the lack of hyperparameters that need to be set by the user and the ease of selection. \memodt{as far as I can tell, don't all MCMCs you discuss require 2 hyperparameters?}
-Only two major hyperparameters need to be chosen, these are the number of walkers in the ensemble and the `aggressiveness of the stretch moves' (denoted as $a$ in the emcee \memodt{use consistent notation. Earlier you used EMCEE} documentation). 
+Only two major hyperparameters need to be chosen, these are the number of walkers in the ensemble and the `aggressiveness of the stretch moves' (denoted as $a$ in the emcee documentation). \memodt{use consistent notation. Earlier you used EMCEE}
+\memohr{You first say that every MCMC has hyperparameters, then that the affine invarient sampler has none. Then finally you say that it has two! This can be simplified!}
+\memohr{I'd be consistent and either call it affine invarient sapler or emcee. People might get lost if you switch back and forth.}
+
 The performance of emcee increases with more walkers, for our test problems we have found 32 walkers to be sufficient as adding more did not give significant gains in performance. 
+\memohr{Again, you can't say the opposite in two sentences that follow each other. Either the performance increases, or it does not increase. I know what you want to say, but it needs to be more precise and ideally more concise.}
 The $a$ parameter was left at the recommended default value (a=2), we refer the reader to \cite{Foreman-Mackey2013} for a more detailed explanation on the significance of the parameter. 
+\memohr{You start this section by saying that you describe how to select hyper parameters. But know you say you just stick to the previsouly used one! Again, I know what you've done and why you keep it fixed at 2, but you can't say the opposite to what you've said before}
+\memohr{I'm sorry. By now this page looks like one of those PhD comics where the advisers gives back a draft to the student. It looks worse than it is! I'm pointing these things out because it is your first paper. Otherwise I would just correct it myself. But I want you to see what I would like to change and why.}
 Another factor to consider is how the walkers are initialized. In general, initializing the ensemble as a small Gaussian sphere works remarkably well in almost every scenario. 
 However, this approach may require a significant burn-in phase as the walkers expand to occupy the local shape of the likelihood space.
+
  
 For SMALA we need to specify a step scale $\epsilon$ and the softabs' $\alpha$ hyperparameter. \memodt{bring $\alpha$ paragraph down to this section}
 The $\epsilon$ sets the `aggressiveness' of proposals and is used to fine-tune the acceptance rate. 
@@ -241,6 +248,18 @@ According to \cite{robert1998} the optimal acceptance rate tends towards $57\%$ 
 The intuition for the $\alpha$ parameter is that it gives and maximum width to the proposal parabola \memodt{of scale 1/$\alpha$?.}
 In the limiting case where this parameter is miscalculated \memodt{set too high} and inhibits the MCMC's ability to make proposals, SMALA will behave like a Metropolis-Hastings MCMC. 
 This is shown in Figure \ref{alpha}. \memodt{is it really showing a case where $\alpha$ is set too high? The plot might more clearly show what alpha does if it had red points for a run with no softabs (or with an extreme alpha that only prevents it from crashing).} 
+
+\memohr{In general the phrases 'works remarkably well' and 'in almost every scenario' are not very precise. Either say it works in all cases tested in this paper. Or way when it does not work. Having the information that it sometimes works and sometimes not, is not very useful by itself.}
+
+For SMALA we need to specify a step scale $\epsilon$ and the softabs' $\alpha$ hyperparameter. \memodt{bring $\alpha$ paragraph down to this section}
+The $\epsilon$ sets the `aggressiveness' of proposals and is used to fine-tune the acceptance rate. 
+Geometrically, this corresponds to how far up the N-dimensional parabola we let the added `randomness' go. 
+According to \cite{robert1998} the optimal acceptance rate tends towards $57\%$ as the dimensionality goes to infinity, thus we tune $\epsilon$ to give an acceptance rate in this limit.
+The intuition for the $\alpha$ parameter is that it gives and maximum width to the proposal parabola. 
+In the limiting case where this parameter is miscalculated \memodt{set too high} and inhibits the MCMC's ability to make proposals, SMALA will behave like a Metropolis-Hastings MCMC. 
+This is shown in Figure \ref{alpha}. \memodt{is it really showing a case where $\alpha$ is set too high? The plot might more clearly show what alpha does if it had red points for a run with no softabs (or with an extreme alpha that only prevents it from crashing).} 
+\memohr{You need to introduce Figure 1 a bit more. What is shown, what is the test case, etc, basically what you have in the figure caption. The captions need to be very short and concise. }
+
 While if we let $\alpha$ be too large, this may lead to numerical instabilities. 
 In the context of exoplanets, both of the aforementioned parameters should approximately be of order unity.
 \memodt{why don't you have to choose an alpha for each parameter?}
@@ -262,15 +281,19 @@ When using HMC we have three major hyperparameters to select.
 We must pick out a $\delta$ for the leapfrog steps, the number of leapfrog steps $L$ before testing a proposal state, and we need an appropriate mass matrix $M$ which corresponds the the scales and correlation of the parameters. 
 A complete description can be found in chapter 5 of the MCMC Handbook \cite{1206.1901}. 
 Due to the cost of evaluating the likelihood and its derivatives, $L=1$ gives the best efficiency score even when $N=1$. 
+\memohr{Please state if you found this out or if this comes from some other work.}
 The $\delta$ parameter is degenerate in the sense that changing it corresponds to the same effect as multiplying the mass matrix by some coefficient.
 Hence, we chose a $\delta$ of order unity. \memodt{If this is true, then there are only two hyperparameters and you might not even mention delta}
 For the selection of the matrix $M$ we use have opted to only specify the diagonal as doing all $N^2$ elements would be very time consuming.
 The optimal acceptance rate for the HMC algorithm is determined by \cite{1001.4460}. 
 In the limiting case of $L=1$ we obtain best results near an acceptance rate of $57\%$, in contrast with the optimal results for $L>1$ which are a few percent higher at $65\%$. 
+\memohr{I'm confused. You just said L=1 has the best acceptance ratio?}
 In addition to having an appropriate acceptance rate, we require the diagonal of $M$ to give autocorrelation rates which are approximately equal.
 A good initial guess of the diagonal can be given by the inverse of the parameters. 
 These masses are then tweaked according to the guidelines above.
+
 \memodt{If it's really the case that HMC has an NxN mass matrix and L to pick, and the others really only have two scalar hyperparameters, then it's misleading to say they all have 2 hyperparameters. Of course you don't see that for this 1-D example, but I think you want to state the number of scalar hyperparameters each one has (I guess HMC would be NxN + 1), to really motivate why certain ones are easier for the user.}
+\memohr{Again, this is just a bit too vague. What does tweaking mean here? And how about parameters such as angles? Or parameters which are initially set to 0 like the eccentricirty?}
 
 \memodt{I think the rest of this section might make more sense in Sec. 3, since you keep having to refer forward to it. Sec. 3 might start with a subsection on metrics that defines ESS, and then start with this discussion of tuning hyperparameters in your N=1 example.}
 Consider an example of $N=4$ \memodt{you used $n$ before}. 
@@ -278,6 +301,7 @@ Given the above procedure guidelines, say we would obtain an acceptance rate of 
 This would not constitute an appropriate MCMC run as one of the parameters will be greatly under determined due to inefficient sampling in that dimension. 
 In contrast, if we would change the mass hyperparameters to give an acceptance rate of $54\%$ with $AC_N = 6, 7, 5, 8$, this would result in an appropriate instance of the MCMC with greater efficiency than the former. 
 Namely, the efficiency is limited by the longest autocorrelation time (which gives the smallest effective sample size). 
+\memohr{You define ESS later, but already use it here.}
 Unfortunately, a certain amount of trial and error, and thus human labor, is required in order to find appropriate hyperparameters. 
 One of the advantages of EMCEE and SMALA over HMC is the ease of selecting these hyperparameters. \memodt{So is it true that you have to tune hyperparameters not only to get a good acceptance rate, but to get a short and uniform autocorrelation time in each of the parameters? Is this not true for EMCEE and SMALA?}
 
@@ -288,15 +312,17 @@ With each run a chosen hyperparameter is randomized. The measure of efficiency i
 This measure will converge in the limit of infinite MCMC steps. 
 For this Monte Carlo data, each run will have approximately 1000 autocorrelation times (as measured from near optimal performance) or alternatively, a few hundred effective samples. 
 This corresponds to approximately 10000 steps for each SMALA run and 25000 steps for each HMC score evaluation. 
+\memohr{I'm not sure what the last few sentences are about.}
+\memohr{It's also a bit confusing to refer to section 3 and 3.2 here. Am I supposed to read section 3 now?}
 
-In Figure \ref{sensfig} can see the efficiency score as a function of hyperparameter value. 
+In Figure \ref{sensfig} one can see the efficiency score as a function of hyperparameter value. 
 In the upper portion of the plot we see SMALA, while the lower subplot shows the HMC performances. For SMALA we see performance smoothly decreasing as the hyperparameters receives larger perturbations from the optimal. 
 However, we note that there are a few points near optimal $\epsilon$ which give low scores. 
 These correspond to MCMC runs where the algorithm becomes entrapped in a part of phase space. 
 These are rare occurrences when the MCMC fails to make good proposals for many steps in a row. \memodt{If true, I think you want to emphasize that SMALA gets out of these eventually, but getting stuck in them lowers the efficiency}
 For the HMC runs we observe that the hyperparameter is less smooth and appears to mimic a stepwise function on the left of the plot. 
 This qualitatively shows that we may obtain non-trivial behavior when trying to optimize the HMC hyperparameters. 
-As such, it can be somewhat challenging for a human to find the best mass hyperparameters for HMC in high dimensional cases given increasing sensitivity. 
+As such, it can be somewhat challenging for a human \memohr{I guess it's challenging, period.} to find the best mass hyperparameters for HMC in high dimensional cases given increasing sensitivity. 
 This is expected as the likelihood space becomes more complex.
 
 \begin{figure}
